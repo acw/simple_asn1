@@ -527,6 +527,45 @@ fn encode_len(x: usize) -> Vec<u8> {
     }
 }
 
+// ----------------------------------------------------------------------------
+
+pub trait FromASN1 : Sized {
+    type Error : From<ASN1DecodeErr>;
+
+    fn from_asn1(v: &[ASN1Block]) -> Result<(Self,&[ASN1Block]),Self::Error>;
+}
+
+pub fn der_decode<T: FromASN1>(v: &[u8]) -> Result<T,T::Error>
+{
+    let vs = from_der(v)?;
+    T::from_asn1(&vs).and_then(|(a,_)| Ok(a))
+}
+
+pub trait ToASN1 {
+    type Error : From<ASN1EncodeErr>;
+
+    fn to_asn1(&self) -> Result<Vec<ASN1Block>,Self::Error> {
+        self.to_asn1_class(ASN1Class::Universal)
+    }
+    fn to_asn1_class(&self, c: ASN1Class)
+        -> Result<Vec<ASN1Block>,Self::Error>;
+}
+
+pub fn der_encode<T: ToASN1>(v: &T) -> Result<Vec<u8>,T::Error>
+{
+    let blocks = T::to_asn1(&v)?;
+    let mut res = Vec::new();
+
+    for block in blocks {
+        let mut x = to_der(&block)?;
+        res.append(&mut x);
+    }
+
+    Ok(res)
+}
+
+// ----------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use quickcheck::{Arbitrary,Gen};
