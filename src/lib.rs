@@ -14,13 +14,54 @@ pub enum ASN1Block {
     BitString(ASN1Class, usize, Vec<u8>),
     OctetString(ASN1Class, Vec<u8>),
     Null(ASN1Class),
-    ObjectIdentifier(ASN1Class, Vec<BigUint>),
+    ObjectIdentifier(ASN1Class, OID),
     IA5String(ASN1Class, String),
     UTF8String(ASN1Class, String),
     Sequence(ASN1Class, Vec<ASN1Block>),
     Set(ASN1Class, Vec<ASN1Block>),
     Unknown(ASN1Class, BigUint, Vec<u8>)
 }
+
+#[derive(Clone,Debug,PartialEq)]
+pub struct OID(Vec<BigUint>);
+
+impl OID {
+    pub fn new(x: Vec<BigUint>) -> OID {
+        OID(x)
+    }
+}
+
+impl<'a> PartialEq<OID> for &'a OID {
+    fn eq(&self, v2: &OID) -> bool {
+        let &&OID(ref vec1) = self;
+        let &OID(ref vec2) = v2;
+
+        if vec1.len() != vec2.len() {
+            return false
+        }
+
+        for i in 0..vec1.len() {
+            if vec1[i] != vec2[i] {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+#[macro_export]
+macro_rules! oid {
+    ( $( $e: expr ),* ) => {{
+        let mut res = Vec::new();
+
+        $(
+            res.push(BigUint::from($e as u64));
+        )*
+        OID::new(res)
+    }};
+}
+
 
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
@@ -103,7 +144,7 @@ pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
                     oidres.push(decode_base127(body, &mut bindex));
                 }
 
-                result.push(ASN1Block::ObjectIdentifier(class, oidres));
+                result.push(ASN1Block::ObjectIdentifier(class, OID(oidres)));
             }
             // UTF8STRING
             Some(0x0C) => {
@@ -282,7 +323,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             Ok(result)
         }
         // OBJECT IDENTIFIER
-        &ASN1Block::ObjectIdentifier(cl, ref nums) => {
+        &ASN1Block::ObjectIdentifier(cl, OID(ref nums)) => {
             match (nums.get(0), nums.get(1)) {
                 (Some(v1), Some(v2)) => {
                     let two = BigUint::from_u8(2).unwrap();
@@ -595,22 +636,29 @@ mod tests {
         ASN1Block::Null(class)
     }
 
-    fn arb_objid<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let     class = ASN1Class::arbitrary(g);
-        let     count = g.gen_range::<usize>(0, 40);
-        let     val1  = g.gen::<u8>() % 3;
-        let     v2mod = if val1 == 2 { 176 } else { 40 };
-        let     val2  = g.gen::<u8>() % v2mod;
-        let     v1    = BigUint::from_u8(val1).unwrap();
-        let     v2    = BigUint::from_u8(val2).unwrap();
-        let mut nums  = vec![v1, v2];
+    impl Arbitrary for OID {
+        fn arbitrary<G: Gen>(g: &mut G) -> OID {
+            let     count = g.gen_range::<usize>(0, 40);
+            let     val1  = g.gen::<u8>() % 3;
+            let     v2mod = if val1 == 2 { 176 } else { 40 };
+            let     val2  = g.gen::<u8>() % v2mod;
+            let     v1    = BigUint::from_u8(val1).unwrap();
+            let     v2    = BigUint::from_u8(val2).unwrap();
+            let mut nums  = vec![v1, v2];
 
-        for _ in 0..count {
-            let num = RandomUint::arbitrary(g);
-            nums.push(num.x);
+            for _ in 0..count {
+                let num = RandomUint::arbitrary(g);
+                nums.push(num.x);
+            }
+
+            OID(nums)
         }
+    }
 
-        ASN1Block::ObjectIdentifier(class, nums)
+    fn arb_objid<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+        let oid   = OID::arbitrary(g);
+        ASN1Block::ObjectIdentifier(class, oid)
     }
 
     fn arb_seq<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
