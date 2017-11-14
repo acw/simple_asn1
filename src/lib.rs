@@ -789,7 +789,7 @@ mod tests {
     fn can_parse(f: &str) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
         let mut fd = File::open(f).unwrap();
         let mut buffer = Vec::new();
-        fd.read_to_end(&mut buffer);
+        let _amt = fd.read_to_end(&mut buffer);
         from_der(&buffer[..])
     }
 
