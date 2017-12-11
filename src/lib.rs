@@ -17,6 +17,7 @@ pub enum ASN1Block {
     ObjectIdentifier(ASN1Class, OID),
     IA5String(ASN1Class, String),
     UTF8String(ASN1Class, String),
+    PrintableString(ASN1Class, String),
     Sequence(ASN1Class, Vec<ASN1Block>),
     Set(ASN1Class, Vec<ASN1Block>),
     Unknown(ASN1Class, BigUint, Vec<u8>)
@@ -62,6 +63,8 @@ macro_rules! oid {
     }};
 }
 
+const PRINTABLE_CHARS: &'static str =
+  "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
 
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
@@ -71,7 +74,8 @@ pub enum ASN1DecodeErr {
     EmptyBuffer,
     BadBooleanLength,
     LengthTooLarge,
-    UTF8DecodeFailure
+    UTF8DecodeFailure,
+    PrintableStringDecodeFailure
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -172,6 +176,20 @@ pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
                     Err(e) =>
                         return Err(e)
                 }
+            }
+            // PRINTABLE STRING
+            Some(0x13) => {
+                let mut res = String::new();
+                let mut val = body.iter().map(|x| *x as char);
+
+                for c in val {
+                    if PRINTABLE_CHARS.contains(c) {
+                        res.push(c);
+                    } else {
+                        return Err(ASN1DecodeErr::PrintableStringDecodeFailure);
+                    }
+                }
+                result.push(ASN1Block::PrintableString(class, res));
             }
             // IA5 (ASCII) STRING
             Some(0x16) => {
@@ -400,6 +418,24 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             }
 
             let inttag = BigUint::from_u8(0x11).unwrap();
+            let mut lenbytes = encode_len(body.len());
+            let mut tagbytes = encode_tag(cl, &inttag);
+
+            let mut res = Vec::new();
+            res.append(&mut tagbytes);
+            res.append(&mut lenbytes);
+            res.append(&mut body);
+            Ok(res)
+        }
+        // PrintableString
+        &ASN1Block::PrintableString(cl, ref str) => {
+            let mut body = Vec::new();
+
+            for c in str.chars() {
+                body.push(c as u8);
+            }
+
+            let inttag = BigUint::from_u8(0x13).unwrap();
             let mut lenbytes = encode_len(body.len());
             let mut tagbytes = encode_tag(cl, &inttag);
 
@@ -724,6 +760,19 @@ mod tests {
         ASN1Block::Set(class, items)
     }
 
+    fn arb_print<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+        let count = g.gen_range::<usize>(0, 384);
+        let mut items = Vec::new();
+
+        for _ in 0..count {
+            let v = g.choose(PRINTABLE_CHARS.as_bytes()).unwrap();
+            items.push(*v as char);
+        }
+
+        ASN1Block::PrintableString(class, String::from_iter(items.iter()))
+    }
+
     fn arb_ia5<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         let class = ASN1Class::arbitrary(g);
         let count = g.gen_range::<usize>(0, 384);
@@ -759,6 +808,7 @@ mod tests {
                  arb_octstr,
                  arb_null,
                  arb_objid,
+                 arb_print,
                  arb_ia5,
                  arb_utf8,
                  arb_unknown];
