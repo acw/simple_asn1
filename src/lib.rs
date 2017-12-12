@@ -15,9 +15,12 @@ pub enum ASN1Block {
     OctetString(ASN1Class, Vec<u8>),
     Null(ASN1Class),
     ObjectIdentifier(ASN1Class, OID),
+    TeletexString(ASN1Class, String),
+    PrintableString(ASN1Class, String),
+    UniversalString(ASN1Class, String),
     IA5String(ASN1Class, String),
     UTF8String(ASN1Class, String),
-    PrintableString(ASN1Class, String),
+    BMPString(ASN1Class, String),
     Sequence(ASN1Class, Vec<ASN1Block>),
     Set(ASN1Class, Vec<ASN1Block>),
     Unknown(ASN1Class, BigUint, Vec<u8>)
@@ -191,10 +194,37 @@ pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
                 }
                 result.push(ASN1Block::PrintableString(class, res));
             }
+            // TELETEX STRINGS
+            Some(0x14) => {
+                match String::from_utf8(body.to_vec()) {
+                    Ok(v) =>
+                        result.push(ASN1Block::TeletexString(class, v)),
+                    Err(_) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                }
+            }
             // IA5 (ASCII) STRING
             Some(0x16) => {
                 let val = body.iter().map(|x| *x as char);
                 result.push(ASN1Block::IA5String(class, String::from_iter(val)))
+            }
+            // UNIVERSAL STRINGS
+            Some(0x1C) => {
+                match String::from_utf8(body.to_vec()) {
+                    Ok(v) =>
+                        result.push(ASN1Block::UniversalString(class, v)),
+                    Err(_) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                }
+            }
+            // UNIVERSAL STRINGS
+            Some(0x1E) => {
+                match String::from_utf8(body.to_vec()) {
+                    Ok(v) =>
+                        result.push(ASN1Block::BMPString(class, v)),
+                    Err(_) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                }
             }
             // Dunno.
             _ => {
@@ -427,55 +457,18 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             res.append(&mut body);
             Ok(res)
         }
-        // PrintableString
-        &ASN1Block::PrintableString(cl, ref str) => {
-            let mut body = Vec::new();
-
-            for c in str.chars() {
-                body.push(c as u8);
-            }
-
-            let inttag = BigUint::from_u8(0x13).unwrap();
-            let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
-
-            let mut res = Vec::new();
-            res.append(&mut tagbytes);
-            res.append(&mut lenbytes);
-            res.append(&mut body);
-            Ok(res)
-        }
-        // IA5String
-        &ASN1Block::IA5String(cl, ref str) => {
-            let mut body = Vec::new();
-
-            for c in str.chars() {
-                body.push(c as u8);
-            }
-
-            let inttag = BigUint::from_u8(0x16).unwrap();
-            let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
-
-            let mut res = Vec::new();
-            res.append(&mut tagbytes);
-            res.append(&mut lenbytes);
-            res.append(&mut body);
-            Ok(res)
-        }
-        // UTF8STRING
-        &ASN1Block::UTF8String(cl, ref val) => {
-            let mut body = val.clone().into_bytes();
-            let inttag = BigUint::from_u8(0x0C).unwrap();
-            let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
-
-            let mut res = Vec::new();
-            res.append(&mut tagbytes);
-            res.append(&mut lenbytes);
-            res.append(&mut body);
-            Ok(res)
-        }
+        &ASN1Block::UTF8String(cl, ref str)      =>
+            encode_asn1_string(0x0c, false, cl, str),
+        &ASN1Block::PrintableString(cl, ref str) =>
+            encode_asn1_string(0x13, true,  cl, str),
+        &ASN1Block::TeletexString(cl, ref str)   =>
+            encode_asn1_string(0x14, false, cl, str),
+        &ASN1Block::UniversalString(cl, ref str) =>
+            encode_asn1_string(0x1c, false, cl, str),
+        &ASN1Block::IA5String(cl, ref str)       =>
+            encode_asn1_string(0x16, true,  cl, str),
+        &ASN1Block::BMPString(cl, ref str)       =>
+            encode_asn1_string(0x1e, false, cl, str),
         // Unknown blocks
         &ASN1Block::Unknown(class, ref tag, ref bytes) => {
             let mut tagbytes = encode_tag(class, &tag);
@@ -488,6 +481,30 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             Ok(res)
         }
     }
+}
+
+fn encode_asn1_string(tag: u8, force_chars: bool, c: ASN1Class, s: &String)
+    -> Result<Vec<u8>,ASN1EncodeErr>
+{
+    let mut body = { if force_chars {
+                         let mut out = Vec::new();
+
+                         for c in s.chars() {
+                             out.push(c as u8);
+                         }
+                         out
+                     } else {
+                         s.clone().into_bytes()
+                     } };
+    let inttag = BigUint::from_u8(tag).unwrap();
+    let mut lenbytes = encode_len(body.len());
+    let mut tagbytes = encode_tag(c, &inttag);
+
+    let mut res = Vec::new();
+    res.append(&mut tagbytes);
+    res.append(&mut lenbytes);
+    res.append(&mut body);
+    Ok(res)
 }
 
 fn encode_tag(c: ASN1Class, t: &BigUint) -> Vec<u8> {
