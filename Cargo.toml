@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["Adam Wick <awick@uhsure.com>"]
 
 [dependencies]
-num = "^0.1.40"
+chrono = "^0.4.0"
+num    = "^0.1.40"
 
 [dev-dependencies]
 quickcheck = "^0.4.1"

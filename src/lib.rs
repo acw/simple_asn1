@@ -1,8 +1,11 @@
+extern crate chrono;
 extern crate num;
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
 
+use chrono::{DateTime,TimeZone,Utc};
+use chrono::offset::LocalResult;
 use num::{BigInt,BigUint,FromPrimitive,One,ToPrimitive,Zero};
 use std::iter::FromIterator;
 use std::mem::size_of;
@@ -15,11 +18,13 @@ pub enum ASN1Block {
     OctetString(ASN1Class, Vec<u8>),
     Null(ASN1Class),
     ObjectIdentifier(ASN1Class, OID),
-    TeletexString(ASN1Class, String),
-    PrintableString(ASN1Class, String),
-    UniversalString(ASN1Class, String),
-    IA5String(ASN1Class, String),
     UTF8String(ASN1Class, String),
+    PrintableString(ASN1Class, String),
+    TeletexString(ASN1Class, String),
+    IA5String(ASN1Class, String),
+    UTCTime(ASN1Class, DateTime<Utc>),
+    GeneralizedTime(ASN1Class, DateTime<Utc>),
+    UniversalString(ASN1Class, String),
     BMPString(ASN1Class, String),
     Sequence(ASN1Class, Vec<ASN1Block>),
     Set(ASN1Class, Vec<ASN1Block>),
@@ -78,7 +83,8 @@ pub enum ASN1DecodeErr {
     BadBooleanLength,
     LengthTooLarge,
     UTF8DecodeFailure,
-    PrintableStringDecodeFailure
+    PrintableStringDecodeFailure,
+    InvalidDateValue(String)
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -207,6 +213,45 @@ pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
             Some(0x16) => {
                 let val = body.iter().map(|x| *x as char);
                 result.push(ASN1Block::IA5String(class, String::from_iter(val)))
+            }
+            // UTCTime
+            Some(0x17) => {
+                if body.len() != 13 {
+                    return Err(ASN1DecodeErr::InvalidDateValue(format!("{}",body.len())));
+                }
+
+                let v = String::from_iter(body.iter().map(|x| *x as char));
+                match Utc.datetime_from_str(&v, "%y%m%d%H%M%SZ") {
+                    Err(_) =>
+                        return Err(ASN1DecodeErr::InvalidDateValue(v)),
+                    Ok(t) => {
+                        result.push(ASN1Block::UTCTime(class, t))
+                    }
+                }
+            }
+            // GeneralizedTime
+            Some(0x18) => {
+                if body.len() < 15 {
+                    return Err(ASN1DecodeErr::InvalidDateValue(format!("{}",body.len())));
+                }
+
+                let mut v = String::from_iter(body.iter().map(|x| *x as char));
+                // We need to add padding back to the string if it's not there.
+                if v.find('.').is_none() {
+                    v.insert(15, '.')
+                }
+                while v.len() < 25 {
+                    let idx = v.len() - 1;
+                    v.insert(idx, '0');
+                }
+                // FIXME (?): Zero padding
+                match Utc.datetime_from_str(&v, "%Y%m%d%H%M%S.%fZ") {
+                    Err(_) =>
+                        return Err(ASN1DecodeErr::InvalidDateValue(v)),
+                    Ok(t) => {
+                        result.push(ASN1Block::GeneralizedTime(class, t))
+                    }
+                }
             }
             // UNIVERSAL STRINGS
             Some(0x1C) => {
@@ -448,6 +493,34 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             }
 
             let inttag = BigUint::from_u8(0x11).unwrap();
+            let mut lenbytes = encode_len(body.len());
+            let mut tagbytes = encode_tag(cl, &inttag);
+
+            let mut res = Vec::new();
+            res.append(&mut tagbytes);
+            res.append(&mut lenbytes);
+            res.append(&mut body);
+            Ok(res)
+        }
+        &ASN1Block::UTCTime(cl, ref time) => {
+            let mut body = time.format("%y%m%d%H%M%SZ").to_string().into_bytes();
+            let inttag = BigUint::from_u8(0x17).unwrap();
+            let mut lenbytes = encode_len(body.len());
+            let mut tagbytes = encode_tag(cl, &inttag);
+
+            let mut res = Vec::new();
+            res.append(&mut tagbytes);
+            res.append(&mut lenbytes);
+            res.append(&mut body);
+            Ok(res)
+        }
+        &ASN1Block::GeneralizedTime(cl, ref time) => {
+            let base = time.format("%Y%m%d%H%M%S.%f").to_string();
+            let zclear = base.trim_right_matches('0');
+            let dclear = zclear.trim_right_matches('.');
+            let mut body = format!("{}Z", dclear).into_bytes();
+
+            let inttag = BigUint::from_u8(0x18).unwrap();
             let mut lenbytes = encode_len(body.len());
             let mut tagbytes = encode_tag(cl, &inttag);
 
@@ -808,6 +881,67 @@ mod tests {
         ASN1Block::UTF8String(class, val)
     }
 
+    fn arb_tele<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+        let val = String::arbitrary(g);
+        ASN1Block::TeletexString(class, val)
+    }
+
+    fn arb_uni<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+        let val = String::arbitrary(g);
+        ASN1Block::UniversalString(class, val)
+    }
+
+    fn arb_bmp<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+        let val = String::arbitrary(g);
+        ASN1Block::BMPString(class, val)
+    }
+
+    fn arb_utc<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+
+        loop {
+            let y = g.gen_range::<i32>(1970,2069);
+            let m = g.gen_range::<u32>(1,13);
+            let d = g.gen_range::<u32>(1,32);
+            match Utc.ymd_opt(y,m,d) {
+                LocalResult::None => {}
+                LocalResult::Single(d) => {
+                    let h = g.gen_range::<u32>(0,24);
+                    let m = g.gen_range::<u32>(0,60);
+                    let s = g.gen_range::<u32>(0,60);
+                    let t = d.and_hms(h,m,s);
+                    return ASN1Block::UTCTime(class, t);
+                }
+                LocalResult::Ambiguous(_,_) => {}
+            }
+        }
+    }
+
+    fn arb_time<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+        let class = ASN1Class::arbitrary(g);
+
+        loop {
+            let y = g.gen_range::<i32>(0,10000);
+            let m = g.gen_range::<u32>(1,13);
+            let d = g.gen_range::<u32>(1,32);
+            match Utc.ymd_opt(y,m,d) {
+                LocalResult::None => {}
+                LocalResult::Single(d) => {
+                    let h = g.gen_range::<u32>(0,24);
+                    let m = g.gen_range::<u32>(0,60);
+                    let s = g.gen_range::<u32>(0,60);
+                    let n = g.gen_range::<u32>(0,1000000000);
+                    let t = d.and_hms_nano(h,m,s,n);
+                    return ASN1Block::GeneralizedTime(class, t);
+                }
+                LocalResult::Ambiguous(_,_) => {}
+            }
+        }
+    }
+
     fn arb_unknown<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         let class = ASN1Class::arbitrary(g);
         let tag   = RandomUint::arbitrary(g);
@@ -825,9 +959,14 @@ mod tests {
                  arb_octstr,
                  arb_null,
                  arb_objid,
-                 arb_print,
-                 arb_ia5,
                  arb_utf8,
+                 arb_print,
+                 arb_tele,
+                 arb_uni,
+                 arb_ia5,
+                 arb_utc,
+                 arb_time,
+                 arb_bmp,
                  arb_unknown];
 
         if d > 0 {
@@ -880,6 +1019,29 @@ mod tests {
     fn result_int(v: i16) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
         let val = BigInt::from(v);
         Ok(vec![ASN1Block::Integer(ASN1Class::Universal, val)])
+    }
+
+    #[test]
+    fn generalized_time_tests() {
+        check_spec(&Utc.ymd(1992, 5, 21).and_hms(0,0,0),
+                   "19920521000000Z".to_string());
+        check_spec(&Utc.ymd(1992, 6, 22).and_hms(12,34,21),
+                   "19920622123421Z".to_string());
+        check_spec(&Utc.ymd(1992, 7, 22).and_hms_milli(13,21,00,300),
+                   "19920722132100.3Z".to_string());
+    }
+
+    fn check_spec(d: &DateTime<Utc>, s: String) {
+        let b = ASN1Block::GeneralizedTime(ASN1Class::Universal, d.clone());
+        match to_der(&b) {
+            Err(_) => assert_eq!(format!("Broken: {}", d), s),
+            Ok(ref vec) => {
+                let mut resvec = vec.clone();
+                resvec.remove(0);
+                resvec.remove(0);
+                assert_eq!(String::from_utf8(resvec).unwrap(), s);
+            }
+        }
     }
 
     #[test]
