@@ -5,7 +5,6 @@ extern crate num;
 extern crate quickcheck;
 
 use chrono::{DateTime,TimeZone,Utc};
-use chrono::offset::LocalResult;
 use num::{BigInt,BigUint,FromPrimitive,One,ToPrimitive,Zero};
 use std::iter::FromIterator;
 use std::mem::size_of;
@@ -694,6 +693,7 @@ pub fn der_encode<T: ToASN1>(v: &T) -> Result<Vec<u8>,T::Error>
 
 #[cfg(test)]
 mod tests {
+    use chrono::offset::LocalResult;
     use quickcheck::{Arbitrary,Gen};
     use std::fs::File;
     use std::io::Read;
