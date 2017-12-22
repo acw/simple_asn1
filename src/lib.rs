@@ -30,6 +30,52 @@ pub enum ASN1Block {
     Unknown(ASN1Class, usize, BigUint, Vec<u8>)
 }
 
+impl ASN1Block {
+    pub fn class(&self) -> ASN1Class {
+        match self {
+            &ASN1Block::Boolean(c,_,_)          => c,
+            &ASN1Block::Integer(c,_,_)          => c,
+            &ASN1Block::BitString(c,_,_,_)      => c,
+            &ASN1Block::OctetString(c,_,_)      => c,
+            &ASN1Block::Null(c,_)               => c,
+            &ASN1Block::ObjectIdentifier(c,_,_) => c,
+            &ASN1Block::UTF8String(c,_,_)       => c,
+            &ASN1Block::PrintableString(c,_,_)  => c,
+            &ASN1Block::TeletexString(c,_,_)    => c,
+            &ASN1Block::IA5String(c,_,_)        => c,
+            &ASN1Block::UTCTime(c,_,_)          => c,
+            &ASN1Block::GeneralizedTime(c,_,_)  => c,
+            &ASN1Block::UniversalString(c,_,_)  => c,
+            &ASN1Block::BMPString(c,_,_)        => c,
+            &ASN1Block::Sequence(c,_,_)         => c,
+            &ASN1Block::Set(c,_,_)              => c,
+            &ASN1Block::Unknown(c,_,_,_)        => c
+        }
+    }
+
+    pub fn offset(&self) -> usize {
+        match self {
+            &ASN1Block::Boolean(_,o,_)          => o,
+            &ASN1Block::Integer(_,o,_)          => o,
+            &ASN1Block::BitString(_,o,_,_)      => o,
+            &ASN1Block::OctetString(_,o,_)      => o,
+            &ASN1Block::Null(_,o)               => o,
+            &ASN1Block::ObjectIdentifier(_,o,_) => o,
+            &ASN1Block::UTF8String(_,o,_)       => o,
+            &ASN1Block::PrintableString(_,o,_)  => o,
+            &ASN1Block::TeletexString(_,o,_)    => o,
+            &ASN1Block::IA5String(_,o,_)        => o,
+            &ASN1Block::UTCTime(_,o,_)          => o,
+            &ASN1Block::GeneralizedTime(_,o,_)  => o,
+            &ASN1Block::UniversalString(_,o,_)  => o,
+            &ASN1Block::BMPString(_,o,_)        => o,
+            &ASN1Block::Sequence(_,o,_)         => o,
+            &ASN1Block::Set(_,o,_)              => o,
+            &ASN1Block::Unknown(_,o,_,_)        => o
+        }
+    }
+}
+
 impl PartialEq for ASN1Block {
     fn eq(&self, other: &ASN1Block) -> bool {
         match (self, other) {
