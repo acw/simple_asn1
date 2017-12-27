@@ -1,3 +1,31 @@
+//! A small ASN.1 parsing library for Rust. In particular, this library is used
+//! to translate the binary DER encoding of an ASN.1-formatted document into the
+//! core primitives of ASN.1. It is assumed that you can do what you need to
+//! from there.
+//!
+//! The critical items for this document are the traits `ToASN1` and `FromASN1`.
+//! The first takes your data type and encodes it into a `Vec` of simple ASN.1
+//! structures (`ASN1Block`s). The latter inverts the process.
+//!
+//! Items that implement `ToASN1` can be used with the function `der_encode`
+//! to provide single-step encoding of a data type to binary DER encoding.
+//! Similarly, items that are `FromASN` can be single-step decoded using
+//! the helper function `der_decode`.
+//!
+//! You can implement one or both traits, depending on your needs. If you do
+//! implement both, the obvious encode/decode quickcheck property is strongly
+//! advised.
+//!
+//! For decoding schemes that require the actual bytes associated with the
+//! binary representation, we also provide `FromASN1WithBody`. This can be
+//! used with the offset information in the primitive `ASN1Block`s to, for
+//! example, validate signatures in X509 documents.
+//! 
+//! Finally, this library supports ASN.1 class information. I'm still not sure
+//! why it's useful, but there it is.
+//!
+//! Please send any bug reports, patches, and curses to the GitHub repository
+//! at <code>https://github.com/acw/simple_asn1</code>.
 extern crate chrono;
 extern crate num;
 #[cfg(test)]
@@ -9,6 +37,25 @@ use num::{BigInt,BigUint,FromPrimitive,One,ToPrimitive,Zero};
 use std::iter::FromIterator;
 use std::mem::size_of;
 
+/// An ASN.1 block class.
+///
+/// I'm not sure if/when these are used, but here they are in case you want
+/// to do something with them.
+#[derive(Clone,Copy,Debug,PartialEq)]
+pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
+
+/// A primitive block from ASN.1.
+///
+/// Primitive blocks all contain the class of the block and the offset from
+/// the beginning of the parsed document, followed by whatever data is
+/// associated with the block. The latter should be fairly self-explanatory,
+/// so let's discuss the offset.
+///
+/// The offset is only valid during the reading process. It is ignored for
+/// the purposes of encoding blocks into their binary form. It is also
+/// ignored for the purpose of comparisons via `==`. It is included entirely
+/// to support the parsing of things like X509 certificates, in which it is
+/// necessary to know when particular blocks end.
 #[derive(Clone,Debug)]
 pub enum ASN1Block {
     Boolean(ASN1Class, usize, bool),
@@ -31,6 +78,8 @@ pub enum ASN1Block {
 }
 
 impl ASN1Block {
+    /// Get the class associated with the given ASN1Block, regardless of what
+    /// kind of block it is.
     pub fn class(&self) -> ASN1Class {
         match self {
             &ASN1Block::Boolean(c,_,_)          => c,
@@ -53,6 +102,8 @@ impl ASN1Block {
         }
     }
 
+    /// Get the starting offset associated with the given ASN1Block, regardless
+    /// of what kind of block it is.
     pub fn offset(&self) -> usize {
         match self {
             &ASN1Block::Boolean(_,o,_)          => o,
@@ -136,10 +187,13 @@ impl PartialEq for ASN1Block {
     }
 }
 
+/// An ASN.1 OID.
 #[derive(Clone,Debug,PartialEq)]
 pub struct OID(Vec<BigUint>);
 
 impl OID {
+    /// Generate an ASN.1. The vector should be in the obvious format,
+    /// with each component going left-to-right.
     pub fn new(x: Vec<BigUint>) -> OID {
         OID(x)
     }
@@ -164,6 +218,10 @@ impl<'a> PartialEq<OID> for &'a OID {
     }
 }
 
+/// A handy macro for generating OIDs from a sequence of `u64`s.
+///
+/// Usage: oid!(1,2,840,113549,1,1,1) creates an OID that matches
+/// 1.2.840.113549.1.1.1. (Coincidentally, this is RSA.)
 #[macro_export]
 macro_rules! oid {
     ( $( $e: expr ),* ) => {{
@@ -179,9 +237,7 @@ macro_rules! oid {
 const PRINTABLE_CHARS: &'static str =
   "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
 
-#[derive(Clone,Copy,Debug,PartialEq)]
-pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
-
+/// An error that can arise decoding ASN.1 primitive blocks.
 #[derive(Clone,Debug,PartialEq)]
 pub enum ASN1DecodeErr {
     EmptyBuffer,
@@ -192,6 +248,7 @@ pub enum ASN1DecodeErr {
     InvalidDateValue(String)
 }
 
+/// An error that can arise encoding ASN.1 primitive blocks.
 #[derive(Clone,Debug,PartialEq)]
 pub enum ASN1EncodeErr {
     ObjectIdentHasTooFewFields,
@@ -199,6 +256,8 @@ pub enum ASN1EncodeErr {
     ObjectIdentVal2TooLarge
 }
 
+/// Translate a binary blob into a series of `ASN1Block`s, or provide an
+/// error if it didn't work.
 pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
     from_der_(i, 0)
 }
@@ -466,6 +525,8 @@ fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
     }
 }
 
+/// Given an `ASN1Block`, covert it to its DER encoding, or return an error
+/// if something broke along the way.
 pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
     match i {
         // BOOLEAN
@@ -768,6 +829,9 @@ fn encode_len(x: usize) -> Vec<u8> {
 
 // ----------------------------------------------------------------------------
 
+/// A trait defining types that can be decoded from an `ASN1Block` stream,
+/// assuming they also have access to the underlying bytes making up the
+/// stream.
 pub trait FromASN1WithBody : Sized {
     type Error : From<ASN1DecodeErr>;
 
@@ -775,6 +839,9 @@ pub trait FromASN1WithBody : Sized {
         -> Result<(Self,&'a[ASN1Block]),Self::Error>;
 }
 
+/// A trait defining types that can be decoded from an `ASN1Block` stream.
+/// Any member of this trait is also automatically a member of
+/// `FromASN1WithBody`, as it can obviously just ignore the body.
 pub trait FromASN1 : Sized {
     type Error : From<ASN1DecodeErr>;
 
@@ -792,12 +859,16 @@ impl<T: FromASN1> FromASN1WithBody for T {
     }
 }
 
+/// Automatically decode a type via DER encoding, assuming that the type
+/// is a member of `FromASN1` or `FromASN1WithBody`.
 pub fn der_decode<T: FromASN1WithBody>(v: &[u8]) -> Result<T,T::Error>
 {
     let vs = from_der(v)?;
     T::from_asn1_with_body(&vs, v).and_then(|(a,_)| Ok(a))
 }
 
+/// The set of types that can automatically converted into a sequence
+/// of `ASN1Block`s.
 pub trait ToASN1 {
     type Error : From<ASN1EncodeErr>;
 
@@ -808,6 +879,8 @@ pub trait ToASN1 {
         -> Result<Vec<ASN1Block>,Self::Error>;
 }
 
+/// Automatically encode a type into binary via DER encoding, assuming
+/// that the type is a member of `ToASN1`.
 pub fn der_encode<T: ToASN1>(v: &T) -> Result<Vec<u8>,T::Error>
 {
     let blocks = T::to_asn1(&v)?;

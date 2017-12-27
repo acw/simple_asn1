@@ -2,6 +2,10 @@
 name = "simple_asn1"
 version = "0.1.0"
 authors = ["Adam Wick <awick@uhsure.com>"]
+categories = ["encoding"]
+keywords = ["ASN.1","data encoding","DER"]
+license-file = "LICENSE"
+repository = "https://github.com/acw/simple_asn1"
 
 [dependencies]
 chrono = "^0.4.0"
