@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Adam Wick <awick@uhsure.com>"]
 description = "A simple DER/ASN.1 encoding/decoding library."
 categories = ["encoding"]
-keywords = ["ASN1","data encoding","DER"]
+keywords = ["ASN1","encoding","DER"]
 license-file = "LICENSE"
 repository = "https://github.com/acw/simple_asn1"
 
