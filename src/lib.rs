@@ -868,7 +868,10 @@ pub fn der_decode<T: FromASN1WithBody>(v: &[u8]) -> Result<T,T::Error>
 }
 
 /// The set of types that can automatically converted into a sequence
-/// of `ASN1Block`s.
+/// of `ASN1Block`s. You should probably use to_asn1() but implement
+/// to_asn1_class(). The former has a default implementation that passes
+/// `ASN1Class::Universal` as the tag to use, which should be good for
+/// most people.
 pub trait ToASN1 {
     type Error : From<ASN1EncodeErr>;
 
