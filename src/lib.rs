@@ -20,7 +20,7 @@
 //! binary representation, we also provide `FromASN1WithBody`. This can be
 //! used with the offset information in the primitive `ASN1Block`s to, for
 //! example, validate signatures in X509 documents.
-//! 
+//!
 //! Finally, this library supports ASN.1 class information. I'm still not sure
 //! why it's useful, but there it is.
 //!
@@ -31,6 +31,8 @@ extern crate num;
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
+#[cfg(test)]
+extern crate rand;
 
 use chrono::{DateTime,TimeZone,Utc};
 use num::{BigInt,BigUint,FromPrimitive,One,ToPrimitive,Zero};
@@ -608,7 +610,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
                         return Err(ASN1EncodeErr::ObjectIdentVal2TooLarge);
                     }
 
-                    // the following unwraps must be safe, based on the 
+                    // the following unwraps must be safe, based on the
                     // validation above.
                     let value1 = v1.to_u8().unwrap();
                     let value2 = v2.to_u8().unwrap();
@@ -905,6 +907,7 @@ mod tests {
     use quickcheck::{Arbitrary,Gen};
     use std::fs::File;
     use std::io::Read;
+    use rand::{Rng, distributions::Standard};
     use super::*;
 
     impl Arbitrary for ASN1Class {
@@ -993,14 +996,14 @@ mod tests {
         let nbits = if modbits > maxbits
                       { maxbits }
                     else { maxbits - modbits };
-        let bytes = g.gen_iter::<u8>().take(size).collect();
+        let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
         ASN1Block::BitString(class, 0, nbits, bytes)
     }
 
     fn arb_octstr<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         let class = ASN1Class::arbitrary(g);
         let size = g.gen::<u16>() as usize % 16;
-        let bytes = g.gen_iter::<u8>().take(size).collect();
+        let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
         ASN1Block::OctetString(class, 0, bytes)
     }
 
@@ -1154,7 +1157,7 @@ mod tests {
         let class = ASN1Class::arbitrary(g);
         let tag   = RandomUint::arbitrary(g);
         let size  = g.gen_range::<usize>(0, 128);
-        let items = g.gen_iter::<u8>().take(size).collect();
+        let items = g.sample_iter::<u8, _>(&Standard).take(size).collect();
 
         ASN1Block::Unknown(class, 0, tag.x, items)
     }
