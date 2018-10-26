@@ -36,6 +36,8 @@ extern crate rand;
 
 use chrono::{DateTime,TimeZone,Utc};
 use num::{BigInt,BigUint,FromPrimitive,One,ToPrimitive,Zero};
+use std::error::Error;
+use std::fmt;
 use std::iter::FromIterator;
 use std::mem::size_of;
 
@@ -256,6 +258,33 @@ pub enum ASN1EncodeErr {
     ObjectIdentHasTooFewFields,
     ObjectIdentVal1TooLarge,
     ObjectIdentVal2TooLarge
+}
+
+impl fmt::Display for ASN1EncodeErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.description())
+    }
+}
+
+impl Error for ASN1EncodeErr {
+    fn description(&self) -> &str {
+        match self {
+            ASN1EncodeErr::ObjectIdentHasTooFewFields =>
+                "ASN1 object identifier has too few fields.",
+            ASN1EncodeErr::ObjectIdentVal1TooLarge =>
+                "First value in ASN1 OID is too big.",
+            ASN1EncodeErr::ObjectIdentVal2TooLarge =>
+                "Second value in ASN1 OID is too big."
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
+
+    fn source(&self) -> Option<&(Error + 'static)> {
+        None
+    }
 }
 
 /// Translate a binary blob into a series of `ASN1Block`s, or provide an
