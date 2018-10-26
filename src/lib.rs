@@ -974,6 +974,7 @@ mod tests {
         }
     }
 
+    #[allow(type_alias_bounds)]
     type ASN1BlockGen<G: Gen> = fn(&mut G, usize) -> ASN1Block;
 
     fn arb_boolean<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
