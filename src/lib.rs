@@ -40,6 +40,7 @@ use std::error::Error;
 use std::fmt;
 use std::iter::FromIterator;
 use std::mem::size_of;
+use std::str::Utf8Error;
 
 /// An ASN.1 block class.
 ///
@@ -245,11 +246,57 @@ const PRINTABLE_CHARS: &'static str =
 #[derive(Clone,Debug,PartialEq)]
 pub enum ASN1DecodeErr {
     EmptyBuffer,
-    BadBooleanLength,
-    LengthTooLarge,
-    UTF8DecodeFailure,
+    BadBooleanLength(usize),
+    LengthTooLarge(usize),
+    UTF8DecodeFailure(Utf8Error),
     PrintableStringDecodeFailure,
     InvalidDateValue(String)
+}
+
+impl fmt::Display for ASN1DecodeErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ASN1DecodeErr::EmptyBuffer =>
+                write!(f, "Encountered an empty buffer decoding ASN1 block."),
+            ASN1DecodeErr::BadBooleanLength(x) =>
+                write!(f, "Bad length field in boolean block: {}", x),
+            ASN1DecodeErr::LengthTooLarge(x) =>
+                write!(f, "Length field too large for object type: {}", x),
+            ASN1DecodeErr::UTF8DecodeFailure(x) =>
+                write!(f, "UTF8 string failed to properly decode: {}", x),
+            ASN1DecodeErr::PrintableStringDecodeFailure =>
+                write!(f, "Printable string failed to properly decode."),
+            ASN1DecodeErr::InvalidDateValue(x) =>
+                write!(f, "Invalid date value: {}", x)
+        }
+    }
+}
+
+impl Error for ASN1DecodeErr {
+    fn description(&self) -> &str {
+        match self {
+            ASN1DecodeErr::EmptyBuffer =>
+                "Encountered an empty buffer decoding ASN1 block.",
+            ASN1DecodeErr::BadBooleanLength(_) =>
+                "Bad length field in boolean block.",
+            ASN1DecodeErr::LengthTooLarge(_) =>
+                "Length field too large for object type.",
+            ASN1DecodeErr::UTF8DecodeFailure(_) =>
+                "UTF8 string failed to properly decode.",
+            ASN1DecodeErr::PrintableStringDecodeFailure =>
+                "Printable string failed to properly decode.",
+            ASN1DecodeErr::InvalidDateValue(_) =>
+                "Invalid date value."
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
+
+    fn source(&self) -> Option<&(Error + 'static)> {
+        None
+    }
 }
 
 /// An error that can arise encoding ASN.1 primitive blocks.
@@ -310,7 +357,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             // BOOLEAN
             Some(0x01) => {
                 if len != 1 {
-                    return Err(ASN1DecodeErr::BadBooleanLength);
+                    return Err(ASN1DecodeErr::BadBooleanLength(len));
                 }
                 result.push(ASN1Block::Boolean(class, soff, body[0] != 0));
             }
@@ -367,8 +414,8 @@ fn from_der_(i: &[u8], start_offset: usize)
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
                         result.push(ASN1Block::UTF8String(class, soff, v)),
-                    Err(_) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                    Err(e) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
             }
             // SEQUENCE
@@ -408,8 +455,8 @@ fn from_der_(i: &[u8], start_offset: usize)
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
                         result.push(ASN1Block::TeletexString(class, soff, v)),
-                    Err(_) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                    Err(e) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
             }
             // IA5 (ASCII) STRING
@@ -461,8 +508,8 @@ fn from_der_(i: &[u8], start_offset: usize)
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
                         result.push(ASN1Block::UniversalString(class, soff, v)),
-                    Err(_) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                    Err(e) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
             }
             // UNIVERSAL STRINGS
@@ -470,8 +517,8 @@ fn from_der_(i: &[u8], start_offset: usize)
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
                         result.push(ASN1Block::BMPString(class, soff, v)),
-                    Err(_) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure)
+                    Err(e) =>
+                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
             }
             // Dunno.
@@ -540,7 +587,7 @@ fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
         let mut res = 0;
 
         if lenlen > size_of::<usize>() {
-            return Err(ASN1DecodeErr::LengthTooLarge);
+            return Err(ASN1DecodeErr::LengthTooLarge(lenlen));
         }
 
         while lenlen > 0 {
