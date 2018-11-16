@@ -836,7 +836,13 @@ fn encode_tag(c: ASN1Class, t: &BigUint) -> Vec<u8> {
     let cbyte = encode_class(c);
 
     match t.to_u8() {
-        Some(x) if x < 31 => {
+        Some(mut x) if x < 31 => {
+            if x == 0x10 || x == 0x11 {
+                // SEQUENCE and SET mut have the constructed encoding form (bit 5) set
+                // See: https://docs.microsoft.com/en-us/windows/desktop/seccertenroll/about-encoded-tag-bytes
+                x |= 0b00_10_00_00;
+            }
+
             vec![cbyte | x]
         }
         _ => {
