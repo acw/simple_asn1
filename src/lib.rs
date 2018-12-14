@@ -27,7 +27,8 @@
 //! Please send any bug reports, patches, and curses to the GitHub repository
 //! at <code>https://github.com/acw/simple_asn1</code>.
 extern crate chrono;
-extern crate num;
+extern crate num_bigint;
+extern crate num_traits;
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
@@ -35,7 +36,8 @@ extern crate quickcheck;
 extern crate rand;
 
 use chrono::{DateTime,TimeZone,Utc};
-use num::{BigInt,BigUint,FromPrimitive,One,ToPrimitive,Zero};
+use num_bigint::{BigInt,BigUint};
+use num_traits::{FromPrimitive,One,ToPrimitive,Zero};
 use std::error::Error;
 use std::fmt;
 use std::iter::FromIterator;
@@ -51,35 +53,51 @@ pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
 
 /// A primitive block from ASN.1.
 ///
-/// Primitive blocks all contain the class of the block and the offset from
-/// the beginning of the parsed document, followed by whatever data is
-/// associated with the block. The latter should be fairly self-explanatory,
-/// so let's discuss the offset.
+/// Primitive blocks all contain the offset from the beginning of the parsed
+/// document, followed by whatever data is associated with the block. The latter
+/// should be fairly self-explanatory, so let's discuss the offset.
 ///
 /// The offset is only valid during the reading process. It is ignored for
 /// the purposes of encoding blocks into their binary form. It is also
 /// ignored for the purpose of comparisons via `==`. It is included entirely
 /// to support the parsing of things like X509 certificates, in which it is
 /// necessary to know when particular blocks end.
+///
+/// The [`ASN1Class`] of explicitly tagged blocks is either `Application`,
+/// `ContextSpecific` or `Private`. `Unknown` can have any class.
+/// The class of all other variants is `Universal`.
+///
+/// [`ASN1Class`]: enum.ASN1Class.html
 #[derive(Clone,Debug)]
 pub enum ASN1Block {
-    Boolean(ASN1Class, usize, bool),
-    Integer(ASN1Class, usize, BigInt),
-    BitString(ASN1Class, usize, usize, Vec<u8>),
-    OctetString(ASN1Class, usize, Vec<u8>),
-    Null(ASN1Class, usize),
-    ObjectIdentifier(ASN1Class, usize, OID),
-    UTF8String(ASN1Class, usize, String),
-    PrintableString(ASN1Class, usize, String),
-    TeletexString(ASN1Class, usize, String),
-    IA5String(ASN1Class, usize, String),
-    UTCTime(ASN1Class, usize, DateTime<Utc>),
-    GeneralizedTime(ASN1Class, usize, DateTime<Utc>),
-    UniversalString(ASN1Class, usize, String),
-    BMPString(ASN1Class, usize, String),
-    Sequence(ASN1Class, usize, Vec<ASN1Block>),
-    Set(ASN1Class, usize, Vec<ASN1Block>),
-    Unknown(ASN1Class, usize, BigUint, Vec<u8>)
+    Boolean(usize, bool),
+    Integer(usize, BigInt),
+    BitString(usize, usize, Vec<u8>),
+    OctetString(usize, Vec<u8>),
+    Null(usize),
+    ObjectIdentifier(usize, OID),
+    UTF8String(usize, String),
+    PrintableString(usize, String),
+    TeletexString(usize, String),
+    IA5String(usize, String),
+    UTCTime(usize, DateTime<Utc>),
+    GeneralizedTime(usize, DateTime<Utc>),
+    UniversalString(usize, String),
+    BMPString(usize, String),
+    Sequence(usize, Vec<ASN1Block>),
+    Set(usize, Vec<ASN1Block>),
+    /// An explicitly tagged block.
+    ///
+    /// The class can be either `Application`, `ContextSpecific` or `Private`.
+    /// The other parameters are `offset`, `tag` and `content`.
+    ///
+    /// This block is always `constructed`.
+    Explicit(ASN1Class, usize, BigUint, Box<ASN1Block>),
+    /// An unkown block.
+    ///
+    /// The parameters are `class`, `constructed`, `offset`, `tag` and
+    /// `content`.
+    Unknown(ASN1Class, bool, usize, BigUint, Vec<u8>)
 }
 
 impl ASN1Block {
@@ -87,23 +105,24 @@ impl ASN1Block {
     /// kind of block it is.
     pub fn class(&self) -> ASN1Class {
         match self {
-            &ASN1Block::Boolean(c,_,_)          => c,
-            &ASN1Block::Integer(c,_,_)          => c,
-            &ASN1Block::BitString(c,_,_,_)      => c,
-            &ASN1Block::OctetString(c,_,_)      => c,
-            &ASN1Block::Null(c,_)               => c,
-            &ASN1Block::ObjectIdentifier(c,_,_) => c,
-            &ASN1Block::UTF8String(c,_,_)       => c,
-            &ASN1Block::PrintableString(c,_,_)  => c,
-            &ASN1Block::TeletexString(c,_,_)    => c,
-            &ASN1Block::IA5String(c,_,_)        => c,
-            &ASN1Block::UTCTime(c,_,_)          => c,
-            &ASN1Block::GeneralizedTime(c,_,_)  => c,
-            &ASN1Block::UniversalString(c,_,_)  => c,
-            &ASN1Block::BMPString(c,_,_)        => c,
-            &ASN1Block::Sequence(c,_,_)         => c,
-            &ASN1Block::Set(c,_,_)              => c,
-            &ASN1Block::Unknown(c,_,_,_)        => c
+            &ASN1Block::Boolean(_,_)          => ASN1Class::Universal,
+            &ASN1Block::Integer(_,_)          => ASN1Class::Universal,
+            &ASN1Block::BitString(_,_,_)      => ASN1Class::Universal,
+            &ASN1Block::OctetString(_,_)      => ASN1Class::Universal,
+            &ASN1Block::Null(_)               => ASN1Class::Universal,
+            &ASN1Block::ObjectIdentifier(_,_) => ASN1Class::Universal,
+            &ASN1Block::UTF8String(_,_)       => ASN1Class::Universal,
+            &ASN1Block::PrintableString(_,_)  => ASN1Class::Universal,
+            &ASN1Block::TeletexString(_,_)    => ASN1Class::Universal,
+            &ASN1Block::IA5String(_,_)        => ASN1Class::Universal,
+            &ASN1Block::UTCTime(_,_)          => ASN1Class::Universal,
+            &ASN1Block::GeneralizedTime(_,_)  => ASN1Class::Universal,
+            &ASN1Block::UniversalString(_,_)  => ASN1Class::Universal,
+            &ASN1Block::BMPString(_,_)        => ASN1Class::Universal,
+            &ASN1Block::Sequence(_,_)         => ASN1Class::Universal,
+            &ASN1Block::Set(_,_)              => ASN1Class::Universal,
+            &ASN1Block::Explicit(c,_,_,_)     => c,
+            &ASN1Block::Unknown(c,_,_,_,_)    => c,
         }
     }
 
@@ -111,23 +130,24 @@ impl ASN1Block {
     /// of what kind of block it is.
     pub fn offset(&self) -> usize {
         match self {
-            &ASN1Block::Boolean(_,o,_)          => o,
-            &ASN1Block::Integer(_,o,_)          => o,
-            &ASN1Block::BitString(_,o,_,_)      => o,
-            &ASN1Block::OctetString(_,o,_)      => o,
-            &ASN1Block::Null(_,o)               => o,
-            &ASN1Block::ObjectIdentifier(_,o,_) => o,
-            &ASN1Block::UTF8String(_,o,_)       => o,
-            &ASN1Block::PrintableString(_,o,_)  => o,
-            &ASN1Block::TeletexString(_,o,_)    => o,
-            &ASN1Block::IA5String(_,o,_)        => o,
-            &ASN1Block::UTCTime(_,o,_)          => o,
-            &ASN1Block::GeneralizedTime(_,o,_)  => o,
-            &ASN1Block::UniversalString(_,o,_)  => o,
-            &ASN1Block::BMPString(_,o,_)        => o,
-            &ASN1Block::Sequence(_,o,_)         => o,
-            &ASN1Block::Set(_,o,_)              => o,
-            &ASN1Block::Unknown(_,o,_,_)        => o
+            &ASN1Block::Boolean(o,_)          => o,
+            &ASN1Block::Integer(o,_)          => o,
+            &ASN1Block::BitString(o,_,_)      => o,
+            &ASN1Block::OctetString(o,_)      => o,
+            &ASN1Block::Null(o)               => o,
+            &ASN1Block::ObjectIdentifier(o,_) => o,
+            &ASN1Block::UTF8String(o,_)       => o,
+            &ASN1Block::PrintableString(o,_)  => o,
+            &ASN1Block::TeletexString(o,_)    => o,
+            &ASN1Block::IA5String(o,_)        => o,
+            &ASN1Block::UTCTime(o,_)          => o,
+            &ASN1Block::GeneralizedTime(o,_)  => o,
+            &ASN1Block::UniversalString(o,_)  => o,
+            &ASN1Block::BMPString(o,_)        => o,
+            &ASN1Block::Sequence(o,_)         => o,
+            &ASN1Block::Set(o,_)              => o,
+            &ASN1Block::Explicit(_,o,_,_)     => o,
+            &ASN1Block::Unknown(_,_,o,_,_)    => o,
         }
     }
 }
@@ -135,57 +155,60 @@ impl ASN1Block {
 impl PartialEq for ASN1Block {
     fn eq(&self, other: &ASN1Block) -> bool {
         match (self, other) {
-            (&ASN1Block::Boolean(a1,_,b1),
-             &ASN1Block::Boolean(a2,_,b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::Integer(a1,_,ref b1),
-             &ASN1Block::Integer(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::BitString(a1,_,b1,ref c1),
-             &ASN1Block::BitString(a2,_,b2,ref c2)) =>
-                (a1 == a2) && (b1 == b2) && (c1 == c2),
-            (&ASN1Block::OctetString(a1,_,ref b1),
-             &ASN1Block::OctetString(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::Null(a1,_),
-             &ASN1Block::Null(a2,_)) =>
+            (&ASN1Block::Boolean(_,a1),
+             &ASN1Block::Boolean(_,a2)) =>
                 (a1 == a2),
-            (&ASN1Block::ObjectIdentifier(a1,_,ref b1),
-             &ASN1Block::ObjectIdentifier(a2,_,ref b2)) =>
+            (&ASN1Block::Integer(_,ref a1),
+             &ASN1Block::Integer(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::BitString(_,a1,ref b1),
+             &ASN1Block::BitString(_,a2,ref b2)) =>
                 (a1 == a2) && (b1 == b2),
-            (&ASN1Block::UTF8String(a1,_,ref b1),
-             &ASN1Block::UTF8String(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::PrintableString(a1,_,ref b1),
-             &ASN1Block::PrintableString(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::TeletexString(a1,_,ref b1),
-             &ASN1Block::TeletexString(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::IA5String(a1,_,ref b1),
-             &ASN1Block::IA5String(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::UTCTime(a1,_,ref b1),
-             &ASN1Block::UTCTime(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::GeneralizedTime(a1,_,ref b1),
-             &ASN1Block::GeneralizedTime(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::UniversalString(a1,_,ref b1),
-             &ASN1Block::UniversalString(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::BMPString(a1,_,ref b1),
-             &ASN1Block::BMPString(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::Sequence(a1,_,ref b1),
-             &ASN1Block::Sequence(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::Set(a1,_,ref b1),
-             &ASN1Block::Set(a2,_,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::Unknown(a1,_,ref b1,ref c1),
-             &ASN1Block::Unknown(a2,_,ref b2,ref c2)) =>
+            (&ASN1Block::OctetString(_,ref a1),
+             &ASN1Block::OctetString(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::Null(_),
+             &ASN1Block::Null(_)) =>
+                true,
+            (&ASN1Block::ObjectIdentifier(_,ref a1),
+             &ASN1Block::ObjectIdentifier(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::UTF8String(_,ref a1),
+             &ASN1Block::UTF8String(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::PrintableString(_,ref a1),
+             &ASN1Block::PrintableString(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::TeletexString(_,ref a1),
+             &ASN1Block::TeletexString(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::IA5String(_,ref a1),
+             &ASN1Block::IA5String(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::UTCTime(_,ref a1),
+             &ASN1Block::UTCTime(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::GeneralizedTime(_,ref a1),
+             &ASN1Block::GeneralizedTime(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::UniversalString(_,ref a1),
+             &ASN1Block::UniversalString(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::BMPString(_,ref a1),
+             &ASN1Block::BMPString(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::Sequence(_,ref a1),
+             &ASN1Block::Sequence(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::Set(_,ref a1),
+             &ASN1Block::Set(_,ref a2)) =>
+                (a1 == a2),
+            (&ASN1Block::Explicit(a1,_,ref b1,ref c1),
+             &ASN1Block::Explicit(a2,_,ref b2,ref c2)) =>
                 (a1 == a2) && (b1 == b2) && (c1 == c2),
+            (&ASN1Block::Unknown(a1,b1,_,ref c1,ref d1),
+             &ASN1Block::Unknown(a2,b2,_,ref c2,ref d2)) =>
+                (a1 == a2) && (b1 == b2) && (c1 == c2) && (d1 == d2),
             _ =>
                 false
         }
@@ -349,39 +372,60 @@ fn from_der_(i: &[u8], start_offset: usize)
 
     while index < len {
         let soff = start_offset + index;
-        let (tag, class) = decode_tag(i, &mut index);
+        let (tag, constructed, class) = decode_tag(i, &mut index);
         let len = decode_length(i, &mut index)?;
         let body = &i[index .. (index + len)];
 
+        if class != ASN1Class::Universal {
+            if constructed {
+                // Try to read as explicitly tagged
+                match from_der_(body, start_offset + index) {
+                    Ok(mut items) => {
+                        if items.len() == 1 {
+                            result.push(ASN1Block::Explicit(class, soff, tag,
+                                Box::new(items.remove(0))));
+                            index += len;
+                            continue;
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+            result.push(ASN1Block::Unknown(class, constructed, soff, tag, body.to_vec()));
+            index += len;
+            continue;
+        }
+
+        // Universal class
         match tag.to_u8() {
             // BOOLEAN
             Some(0x01) => {
                 if len != 1 {
                     return Err(ASN1DecodeErr::BadBooleanLength(len));
                 }
-                result.push(ASN1Block::Boolean(class, soff, body[0] != 0));
+                result.push(ASN1Block::Boolean(soff, body[0] != 0));
             }
             // INTEGER
             Some(0x02) => {
                 let res = BigInt::from_signed_bytes_be(&body);
-                result.push(ASN1Block::Integer(class, soff, res));
+                result.push(ASN1Block::Integer(soff, res));
             }
             // BIT STRING
             Some(0x03) if body.len() == 0 => {
-                result.push(ASN1Block::BitString(class, soff, 0, Vec::new()))
+                result.push(ASN1Block::BitString(soff, 0, Vec::new()))
             }
             Some(0x03) => {
                 let bits = (&body[1..]).to_vec();
                 let nbits = (bits.len() * 8) - (body[0] as usize);
-                result.push(ASN1Block::BitString(class, soff, nbits, bits))
+                result.push(ASN1Block::BitString(soff, nbits, bits))
             }
             // OCTET STRING
             Some(0x04) => {
-                result.push(ASN1Block::OctetString(class, soff, body.to_vec()))
+                result.push(ASN1Block::OctetString(soff, body.to_vec()))
             }
             // NULL
             Some(0x05) => {
-                result.push(ASN1Block::Null(class, soff));
+                result.push(ASN1Block::Null(soff));
             }
             // OBJECT IDENTIFIER
             Some(0x06) => {
@@ -407,13 +451,13 @@ fn from_der_(i: &[u8], start_offset: usize)
                 }
                 let res = OID(oidres);
 
-                result.push(ASN1Block::ObjectIdentifier(class, soff, res))
+                result.push(ASN1Block::ObjectIdentifier(soff, res))
             }
             // UTF8STRING
             Some(0x0C) => {
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
-                        result.push(ASN1Block::UTF8String(class, soff, v)),
+                        result.push(ASN1Block::UTF8String(soff, v)),
                     Err(e) =>
                         return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
@@ -422,7 +466,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             Some(0x10) => {
                 match from_der_(body, start_offset + index) {
                     Ok(items) =>
-                        result.push(ASN1Block::Sequence(class, soff, items)),
+                        result.push(ASN1Block::Sequence(soff, items)),
                     Err(e) =>
                         return Err(e)
                 }
@@ -431,7 +475,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             Some(0x11) => {
                 match from_der_(body, start_offset + index) {
                     Ok(items) =>
-                        result.push(ASN1Block::Set(class, soff, items)),
+                        result.push(ASN1Block::Set(soff, items)),
                     Err(e) =>
                         return Err(e)
                 }
@@ -448,13 +492,13 @@ fn from_der_(i: &[u8], start_offset: usize)
                         return Err(ASN1DecodeErr::PrintableStringDecodeFailure);
                     }
                 }
-                result.push(ASN1Block::PrintableString(class, soff, res));
+                result.push(ASN1Block::PrintableString(soff, res));
             }
             // TELETEX STRINGS
             Some(0x14) => {
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
-                        result.push(ASN1Block::TeletexString(class, soff, v)),
+                        result.push(ASN1Block::TeletexString(soff, v)),
                     Err(e) =>
                         return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
@@ -463,7 +507,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             Some(0x16) => {
                 let val = body.iter().map(|x| *x as char);
                 let res = String::from_iter(val);
-                result.push(ASN1Block::IA5String(class, soff, res))
+                result.push(ASN1Block::IA5String(soff, res))
             }
             // UTCTime
             Some(0x17) => {
@@ -476,7 +520,7 @@ fn from_der_(i: &[u8], start_offset: usize)
                     Err(_) =>
                         return Err(ASN1DecodeErr::InvalidDateValue(v)),
                     Ok(t) => {
-                        result.push(ASN1Block::UTCTime(class, soff, t))
+                        result.push(ASN1Block::UTCTime(soff, t))
                     }
                 }
             }
@@ -499,7 +543,7 @@ fn from_der_(i: &[u8], start_offset: usize)
                     Err(_) =>
                         return Err(ASN1DecodeErr::InvalidDateValue(v)),
                     Ok(t) => {
-                        result.push(ASN1Block::GeneralizedTime(class, soff, t))
+                        result.push(ASN1Block::GeneralizedTime(soff, t))
                     }
                 }
             }
@@ -507,7 +551,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             Some(0x1C) => {
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
-                        result.push(ASN1Block::UniversalString(class, soff, v)),
+                        result.push(ASN1Block::UniversalString(soff, v)),
                     Err(e) =>
                         return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
@@ -516,14 +560,14 @@ fn from_der_(i: &[u8], start_offset: usize)
             Some(0x1E) => {
                 match String::from_utf8(body.to_vec()) {
                     Ok(v) =>
-                        result.push(ASN1Block::BMPString(class, soff, v)),
+                        result.push(ASN1Block::BMPString(soff, v)),
                     Err(e) =>
                         return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
                 }
             }
             // Dunno.
             _ => {
-                result.push(ASN1Block::Unknown(class, soff, tag, body.to_vec()));
+                result.push(ASN1Block::Unknown(class, constructed, soff, tag, body.to_vec()));
             }
         }
         index += len;
@@ -536,17 +580,19 @@ fn from_der_(i: &[u8], start_offset: usize)
     }
 }
 
-fn decode_tag(i: &[u8], index: &mut usize) -> (BigUint, ASN1Class) {
+/// Returns the tag, if the type is constructed and the class.
+fn decode_tag(i: &[u8], index: &mut usize) -> (BigUint, bool, ASN1Class) {
     let tagbyte = i[*index];
+    let constructed = (tagbyte & 0b0010_0000) != 0;
     let class   = decode_class(tagbyte);
-    let basetag = tagbyte & 0b11111;
+    let basetag = tagbyte & 0b1_1111;
 
     *index += 1;
-    if basetag == 0b11111 {
+    if basetag == 0b1_1111 {
         let res = decode_base127(i, index);
-        (res, class)
+        (res, constructed, class)
     } else {
-        (BigUint::from(basetag), class)
+        (BigUint::from(basetag), constructed, class)
     }
 }
 
@@ -608,19 +654,19 @@ fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
 pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
     match i {
         // BOOLEAN
-        &ASN1Block::Boolean(cl, _, val) => {
+        &ASN1Block::Boolean(_, val) => {
             let inttag = BigUint::one();
-            let mut tagbytes = encode_tag(cl, &inttag);
+            let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
             tagbytes.push(1);
             tagbytes.push(if val { 0xFF } else { 0x00 });
             Ok(tagbytes)
         }
         // INTEGER
-        &ASN1Block::Integer(cl, _, ref int) => {
+        &ASN1Block::Integer(_, ref int) => {
             let mut base = int.to_signed_bytes_be();
             let mut lenbytes = encode_len(base.len());
             let     inttag   = BigUint::from_u8(0x02).unwrap();
-            let mut tagbytes = encode_tag(cl, &inttag);
+            let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
 
             let mut result = Vec::new();
             result.append(&mut tagbytes);
@@ -629,9 +675,9 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             Ok(result)
         }
         // BIT STRING
-        &ASN1Block::BitString(cl, _, bits, ref vs) => {
+        &ASN1Block::BitString(_, bits, ref vs) => {
             let inttag = BigUint::from_u8(0x03).unwrap();
-            let mut tagbytes = encode_tag(cl, &inttag);
+            let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
 
             if bits == 0 {
                 tagbytes.push(0);
@@ -644,31 +690,31 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
                 result.append(&mut tagbytes);
                 result.append(&mut lenbytes);
                 result.push(nbits as u8);
-                result.extend(vs.iter());
+                result.extend_from_slice(vs);
                 Ok(result)
             }
         }
         // OCTET STRING
-        &ASN1Block::OctetString(cl, _, ref bytes) => {
+        &ASN1Block::OctetString(_, ref bytes) => {
             let inttag = BigUint::from_u8(0x04).unwrap();
-            let mut tagbytes = encode_tag(cl, &inttag);
+            let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
             let mut lenbytes = encode_len(bytes.len());
 
             let mut result = Vec::new();
             result.append(&mut tagbytes);
             result.append(&mut lenbytes);
-            result.extend(bytes.iter());
+            result.extend_from_slice(bytes);
             Ok(result)
         }
         // NULL
-        &ASN1Block::Null(cl, _) => {
+        &ASN1Block::Null(_) => {
             let inttag = BigUint::from_u8(0x05).unwrap();
-            let mut result = encode_tag(cl, &inttag);
+            let mut result = encode_tag(ASN1Class::Universal, false, &inttag);
             result.push(0);
             Ok(result)
         }
         // OBJECT IDENTIFIER
-        &ASN1Block::ObjectIdentifier(cl, _, OID(ref nums)) => {
+        &ASN1Block::ObjectIdentifier(_, OID(ref nums)) => {
             match (nums.get(0), nums.get(1)) {
                 (Some(v1), Some(v2)) => {
                     let two = BigUint::from_u8(2).unwrap();
@@ -701,7 +747,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
 
                     // now that we have the body, we can build the header
                     let inttag = BigUint::from_u8(0x06).unwrap();
-                    let mut result = encode_tag(cl, &inttag);
+                    let mut result = encode_tag(ASN1Class::Universal, false, &inttag);
                     let mut lenbytes = encode_len(body.len());
 
                     result.append(&mut lenbytes);
@@ -715,7 +761,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             }
         }
         // SEQUENCE
-        &ASN1Block::Sequence(cl, _, ref items) => {
+        &ASN1Block::Sequence(_, ref items) => {
             let mut body = Vec::new();
 
             // put all the subsequences into a block
@@ -726,7 +772,9 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
 
             let inttag = BigUint::from_u8(0x10).unwrap();
             let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
+            // SEQUENCE and SET mut have the constructed encoding form (bit 5) set
+            // See: https://docs.microsoft.com/en-us/windows/desktop/seccertenroll/about-encoded-tag-bytes
+            let mut tagbytes = encode_tag(ASN1Class::Universal, true, &inttag);
 
             let mut res = Vec::new();
             res.append(&mut tagbytes);
@@ -735,7 +783,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             Ok(res)
         }
         // SET
-        &ASN1Block::Set(cl, _, ref items) => {
+        &ASN1Block::Set(_, ref items) => {
             let mut body = Vec::new();
 
             // put all the subsequences into a block
@@ -746,7 +794,9 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
 
             let inttag = BigUint::from_u8(0x11).unwrap();
             let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
+            // SEQUENCE and SET mut have the constructed encoding form (bit 5) set
+            // See: https://docs.microsoft.com/en-us/windows/desktop/seccertenroll/about-encoded-tag-bytes
+            let mut tagbytes = encode_tag(ASN1Class::Universal, true, &inttag);
 
             let mut res = Vec::new();
             res.append(&mut tagbytes);
@@ -754,11 +804,11 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             res.append(&mut body);
             Ok(res)
         }
-        &ASN1Block::UTCTime(cl, _, ref time) => {
+        &ASN1Block::UTCTime(_, ref time) => {
             let mut body = time.format("%y%m%d%H%M%SZ").to_string().into_bytes();
             let inttag = BigUint::from_u8(0x17).unwrap();
             let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
+            let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
 
             let mut res = Vec::new();
             res.append(&mut tagbytes);
@@ -766,7 +816,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             res.append(&mut body);
             Ok(res)
         }
-        &ASN1Block::GeneralizedTime(cl, _, ref time) => {
+        &ASN1Block::GeneralizedTime(_, ref time) => {
             let base = time.format("%Y%m%d%H%M%S.%f").to_string();
             let zclear = base.trim_right_matches('0');
             let dclear = zclear.trim_right_matches('.');
@@ -774,7 +824,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
 
             let inttag = BigUint::from_u8(0x18).unwrap();
             let mut lenbytes = encode_len(body.len());
-            let mut tagbytes = encode_tag(cl, &inttag);
+            let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
 
             let mut res = Vec::new();
             res.append(&mut tagbytes);
@@ -782,27 +832,38 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
             res.append(&mut body);
             Ok(res)
         }
-        &ASN1Block::UTF8String(cl, _, ref str)      =>
-            encode_asn1_string(0x0c, false, cl, str),
-        &ASN1Block::PrintableString(cl, _, ref str) =>
-            encode_asn1_string(0x13, true,  cl, str),
-        &ASN1Block::TeletexString(cl, _, ref str)   =>
-            encode_asn1_string(0x14, false, cl, str),
-        &ASN1Block::UniversalString(cl, _, ref str) =>
-            encode_asn1_string(0x1c, false, cl, str),
-        &ASN1Block::IA5String(cl, _, ref str)       =>
-            encode_asn1_string(0x16, true,  cl, str),
-        &ASN1Block::BMPString(cl, _, ref str)       =>
-            encode_asn1_string(0x1e, false, cl, str),
-        // Unknown blocks
-        &ASN1Block::Unknown(class, _, ref tag, ref bytes) => {
-            let mut tagbytes = encode_tag(class, &tag);
+        &ASN1Block::UTF8String(_, ref str)      =>
+            encode_asn1_string(0x0c, false, ASN1Class::Universal, str),
+        &ASN1Block::PrintableString(_, ref str) =>
+            encode_asn1_string(0x13, true,  ASN1Class::Universal, str),
+        &ASN1Block::TeletexString(_, ref str)   =>
+            encode_asn1_string(0x14, false, ASN1Class::Universal, str),
+        &ASN1Block::UniversalString(_, ref str) =>
+            encode_asn1_string(0x1c, false, ASN1Class::Universal, str),
+        &ASN1Block::IA5String(_, ref str)       =>
+            encode_asn1_string(0x16, true,  ASN1Class::Universal, str),
+        &ASN1Block::BMPString(_, ref str)       =>
+            encode_asn1_string(0x1e, false, ASN1Class::Universal, str),
+        &ASN1Block::Explicit(class, _, ref tag, ref item) => {
+            let mut tagbytes = encode_tag(class, true, tag);
+            let mut bytes = to_der(item)?;
             let mut lenbytes = encode_len(bytes.len());
 
             let mut res = Vec::new();
             res.append(&mut tagbytes);
             res.append(&mut lenbytes);
-            res.extend(bytes.iter());
+            res.append(&mut bytes);
+            Ok(res)
+        }
+        // Unknown blocks
+        &ASN1Block::Unknown(class, c, _, ref tag, ref bytes) => {
+            let mut tagbytes = encode_tag(class, c, tag);
+            let mut lenbytes = encode_len(bytes.len());
+
+            let mut res = Vec::new();
+            res.append(&mut tagbytes);
+            res.append(&mut lenbytes);
+            res.extend_from_slice(bytes);
             Ok(res)
         }
     }
@@ -823,7 +884,7 @@ fn encode_asn1_string(tag: u8, force_chars: bool, c: ASN1Class, s: &String)
                      } };
     let inttag = BigUint::from_u8(tag).unwrap();
     let mut lenbytes = encode_len(body.len());
-    let mut tagbytes = encode_tag(c, &inttag);
+    let mut tagbytes = encode_tag(c, false, &inttag);
 
     let mut res = Vec::new();
     res.append(&mut tagbytes);
@@ -832,22 +893,23 @@ fn encode_asn1_string(tag: u8, force_chars: bool, c: ASN1Class, s: &String)
     Ok(res)
 }
 
-fn encode_tag(c: ASN1Class, t: &BigUint) -> Vec<u8> {
+fn encode_tag(c: ASN1Class, constructed: bool, t: &BigUint) -> Vec<u8> {
     let cbyte = encode_class(c);
 
     match t.to_u8() {
         Some(mut x) if x < 31 => {
-            if x == 0x10 || x == 0x11 {
-                // SEQUENCE and SET mut have the constructed encoding form (bit 5) set
-                // See: https://docs.microsoft.com/en-us/windows/desktop/seccertenroll/about-encoded-tag-bytes
-                x |= 0b00_10_00_00;
+            if constructed {
+                  x |= 0b0010_0000;
             }
-
             vec![cbyte | x]
         }
         _ => {
             let mut res = encode_base127(t);
-            res.insert(0, cbyte | 0b00011111);
+            let mut x = cbyte | 0b0001_1111;
+            if constructed {
+                  x |= 0b0010_0000;
+            }
+            res.insert(0, x);
             res
         }
     }
@@ -880,10 +942,10 @@ fn encode_base127(v: &BigUint) -> Vec<u8> {
 
 fn encode_class(c: ASN1Class) -> u8 {
     match c {
-        ASN1Class::Universal       => 0b00000000,
-        ASN1Class::Application     => 0b01000000,
-        ASN1Class::ContextSpecific => 0b10000000,
-        ASN1Class::Private         => 0b11000000,
+        ASN1Class::Universal       => 0b0000_0000,
+        ASN1Class::Application     => 0b0100_0000,
+        ASN1Class::ContextSpecific => 0b1000_0000,
+        ASN1Class::Private         => 0b1100_0000,
     }
 }
 
@@ -1027,11 +1089,11 @@ mod tests {
     }
 
    quickcheck! {
-        fn tags_encdec_roundtrips(c: ASN1Class, t: RandomUint) -> bool {
-            let bytes = encode_tag(c, &t.x);
+        fn tags_encdec_roundtrips(c: ASN1Class, con: bool, t: RandomUint) -> bool {
+            let bytes = encode_tag(c, con, &t.x);
             let mut zero = 0;
-            let (t2, c2) = decode_tag(&bytes[..], &mut zero);
-            (c == c2) && (t.x == t2)
+            let (t2, con2, c2) = decode_tag(&bytes[..], &mut zero);
+            (c == c2) && (con == con2) && (t.x == t2)
         }
 
         fn len_encdec_roundtrips(l: usize) -> bool {
@@ -1060,19 +1122,16 @@ mod tests {
     type ASN1BlockGen<G: Gen> = fn(&mut G, usize) -> ASN1Block;
 
     fn arb_boolean<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let c = ASN1Class::arbitrary(g);
         let v = g.gen::<bool>();
-        ASN1Block::Boolean(c, 0, v)
+        ASN1Block::Boolean(0, v)
     }
 
     fn arb_integer<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let c = ASN1Class::arbitrary(g);
         let d = RandomInt::arbitrary(g);
-        ASN1Block::Integer(c, 0, d.x)
+        ASN1Block::Integer(0, d.x)
     }
 
     fn arb_bitstr<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let size = g.gen::<u16>() as usize % 16;
         let maxbits = (size as usize) * 8;
         let modbits = g.gen::<u8>() as usize % 8;
@@ -1080,19 +1139,17 @@ mod tests {
                       { maxbits }
                     else { maxbits - modbits };
         let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
-        ASN1Block::BitString(class, 0, nbits, bytes)
+        ASN1Block::BitString(0, nbits, bytes)
     }
 
     fn arb_octstr<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let size = g.gen::<u16>() as usize % 16;
         let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
-        ASN1Block::OctetString(class, 0, bytes)
+        ASN1Block::OctetString(0, bytes)
     }
 
-    fn arb_null<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
-        ASN1Block::Null(class, 0)
+    fn arb_null<G: Gen>(_g: &mut G, _d: usize) -> ASN1Block {
+        ASN1Block::Null(0)
     }
 
     impl Arbitrary for OID {
@@ -1115,13 +1172,11 @@ mod tests {
     }
 
     fn arb_objid<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let oid   = OID::arbitrary(g);
-        ASN1Block::ObjectIdentifier(class, 0, oid)
+        ASN1Block::ObjectIdentifier(0, oid)
     }
 
     fn arb_seq<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let count = g.gen_range::<usize>(1, 64);
         let mut items = Vec::new();
 
@@ -1129,11 +1184,10 @@ mod tests {
             items.push(limited_arbitrary(g, d - 1));
         }
 
-        ASN1Block::Sequence(class, 0, items)
+        ASN1Block::Sequence(0, items)
     }
 
     fn arb_set<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let count = g.gen_range::<usize>(1, 64);
         let mut items = Vec::new();
 
@@ -1141,11 +1195,10 @@ mod tests {
             items.push(limited_arbitrary(g, d - 1));
         }
 
-        ASN1Block::Set(class, 0, items)
+        ASN1Block::Set(0, items)
     }
 
     fn arb_print<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let count = g.gen_range::<usize>(0, 384);
         let mut items = Vec::new();
 
@@ -1154,11 +1207,10 @@ mod tests {
             items.push(*v as char);
         }
 
-        ASN1Block::PrintableString(class, 0, String::from_iter(items.iter()))
+        ASN1Block::PrintableString(0, String::from_iter(items.iter()))
     }
 
     fn arb_ia5<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let count = g.gen_range::<usize>(0, 384);
         let mut items = Vec::new();
 
@@ -1166,36 +1218,30 @@ mod tests {
             items.push(g.gen::<u8>() as char);
         }
 
-        ASN1Block::IA5String(class, 0, String::from_iter(items.iter()))
+        ASN1Block::IA5String(0, String::from_iter(items.iter()))
     }
 
     fn arb_utf8<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let val = String::arbitrary(g);
-        ASN1Block::UTF8String(class, 0, val)
+        ASN1Block::UTF8String(0, val)
     }
 
     fn arb_tele<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let val = String::arbitrary(g);
-        ASN1Block::TeletexString(class, 0, val)
+        ASN1Block::TeletexString(0, val)
     }
 
     fn arb_uni<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let val = String::arbitrary(g);
-        ASN1Block::UniversalString(class, 0, val)
+        ASN1Block::UniversalString(0, val)
     }
 
     fn arb_bmp<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
         let val = String::arbitrary(g);
-        ASN1Block::BMPString(class, 0, val)
+        ASN1Block::BMPString(0, val)
     }
 
     fn arb_utc<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
-
         loop {
             let y = g.gen_range::<i32>(1970,2069);
             let m = g.gen_range::<u32>(1,13);
@@ -1207,7 +1253,7 @@ mod tests {
                     let m = g.gen_range::<u32>(0,60);
                     let s = g.gen_range::<u32>(0,60);
                     let t = d.and_hms(h,m,s);
-                    return ASN1Block::UTCTime(class, 0, t);
+                    return ASN1Block::UTCTime(0, t);
                 }
                 LocalResult::Ambiguous(_,_) => {}
             }
@@ -1215,8 +1261,6 @@ mod tests {
     }
 
     fn arb_time<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let class = ASN1Class::arbitrary(g);
-
         loop {
             let y = g.gen_range::<i32>(0,10000);
             let m = g.gen_range::<u32>(1,13);
@@ -1229,11 +1273,23 @@ mod tests {
                     let s = g.gen_range::<u32>(0,60);
                     let n = g.gen_range::<u32>(0,1000000000);
                     let t = d.and_hms_nano(h,m,s,n);
-                    return ASN1Block::GeneralizedTime(class, 0, t);
+                    return ASN1Block::GeneralizedTime(0, t);
                 }
                 LocalResult::Ambiguous(_,_) => {}
             }
         }
+    }
+
+    fn arb_explicit<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
+        let mut class = ASN1Class::arbitrary(g);
+        if class == ASN1Class::Universal {
+            // Universal is invalid for an explicitly tagged block
+            class = ASN1Class::ContextSpecific;
+        }
+        let tag   = RandomUint::arbitrary(g);
+        let item  = limited_arbitrary(g, d - 1);
+
+        ASN1Block::Explicit(class, 0, tag.x, Box::new(item))
     }
 
     fn arb_unknown<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
@@ -1242,7 +1298,7 @@ mod tests {
         let size  = g.gen_range::<usize>(0, 128);
         let items = g.sample_iter::<u8, _>(&Standard).take(size).collect();
 
-        ASN1Block::Unknown(class, 0, tag.x, items)
+        ASN1Block::Unknown(class, false, 0, tag.x, items)
     }
 
     fn limited_arbitrary<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
@@ -1266,6 +1322,7 @@ mod tests {
         if d > 0 {
             possibles.push(arb_seq);
             possibles.push(arb_set);
+            possibles.push(arb_explicit);
         }
 
         match g.choose(&possibles[..]) {
@@ -1312,7 +1369,7 @@ mod tests {
 
     fn result_int(v: i16) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
         let val = BigInt::from(v);
-        Ok(vec![ASN1Block::Integer(ASN1Class::Universal, 0, val)])
+        Ok(vec![ASN1Block::Integer(0, val)])
     }
 
     #[test]
@@ -1326,7 +1383,7 @@ mod tests {
     }
 
     fn check_spec(d: &DateTime<Utc>, s: String) {
-        let b = ASN1Block::GeneralizedTime(ASN1Class::Universal, 0, d.clone());
+        let b = ASN1Block::GeneralizedTime(0, d.clone());
         match to_der(&b) {
             Err(_) => assert_eq!(format!("Broken: {}", d), s),
             Ok(ref vec) => {
