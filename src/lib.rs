@@ -374,6 +374,9 @@ fn from_der_(i: &[u8], start_offset: usize)
         let soff = start_offset + index;
         let (tag, constructed, class) = decode_tag(i, &mut index);
         let len = decode_length(i, &mut index)?;
+        if i.len() < index + len {
+            return Err(ASN1DecodeErr::LengthTooLarge(index + len));
+        }
         let body = &i[index .. (index + len)];
 
         if class != ASN1Class::Universal {
