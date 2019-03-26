@@ -36,7 +36,7 @@ extern crate quickcheck;
 extern crate rand;
 
 use chrono::{DateTime,TimeZone,Utc};
-use num_bigint::{BigInt,BigUint};
+pub use num_bigint::{BigInt,BigUint};
 use num_traits::{FromPrimitive,One,ToPrimitive,Zero};
 use std::error::Error;
 use std::fmt;
