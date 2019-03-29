@@ -821,8 +821,8 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
         }
         &ASN1Block::GeneralizedTime(_, ref time) => {
             let base = time.format("%Y%m%d%H%M%S.%f").to_string();
-            let zclear = base.trim_right_matches('0');
-            let dclear = zclear.trim_right_matches('.');
+            let zclear = base.trim_end_matches('0');
+            let dclear = zclear.trim_end_matches('.');
             let mut body = format!("{}Z", dclear).into_bytes();
 
             let inttag = BigUint::from_u8(0x18).unwrap();
