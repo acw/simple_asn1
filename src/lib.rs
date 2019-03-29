@@ -273,7 +273,17 @@ pub enum ASN1DecodeErr {
     LengthTooLarge(usize),
     UTF8DecodeFailure(Utf8Error),
     PrintableStringDecodeFailure,
-    InvalidDateValue(String)
+    InvalidDateValue(String),
+    InvalidBitStringLength(isize),
+    /// Not a valid ASN.1 class
+    InvalidClass(u8),
+    /// Expected more input
+    ///
+    /// Invalid ASN.1 input can lead to this error.
+    Incomplete,
+
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 impl fmt::Display for ASN1DecodeErr {
@@ -290,7 +300,15 @@ impl fmt::Display for ASN1DecodeErr {
             ASN1DecodeErr::PrintableStringDecodeFailure =>
                 write!(f, "Printable string failed to properly decode."),
             ASN1DecodeErr::InvalidDateValue(x) =>
-                write!(f, "Invalid date value: {}", x)
+                write!(f, "Invalid date value: {}", x),
+            ASN1DecodeErr::InvalidBitStringLength(i) =>
+                write!(f, "Invalid length of bit string: {}", i),
+            ASN1DecodeErr::InvalidClass(i) =>
+                write!(f, "Invalid class value: {}", i),
+            ASN1DecodeErr::Incomplete =>
+                write!(f, "Incomplete data or invalid ASN1"),
+            ASN1DecodeErr::__Nonexhaustive =>
+              panic!("A non exhaustive error should not be constructed"),
         }
     }
 }
@@ -309,7 +327,15 @@ impl Error for ASN1DecodeErr {
             ASN1DecodeErr::PrintableStringDecodeFailure =>
                 "Printable string failed to properly decode.",
             ASN1DecodeErr::InvalidDateValue(_) =>
-                "Invalid date value."
+                "Invalid date value.",
+            ASN1DecodeErr::InvalidClass(_) =>
+                "Invalid class value",
+            ASN1DecodeErr::InvalidBitStringLength(_) =>
+                "Invalid length of bit string",
+            ASN1DecodeErr::Incomplete =>
+                "Incomplete data or invalid ASN1",
+            ASN1DecodeErr::__Nonexhaustive =>
+              panic!("A non exhaustive error should not be constructed"),
         }
     }
 
@@ -372,10 +398,11 @@ fn from_der_(i: &[u8], start_offset: usize)
 
     while index < len {
         let soff = start_offset + index;
-        let (tag, constructed, class) = decode_tag(i, &mut index);
+        let (tag, constructed, class) = decode_tag(i, &mut index)?;
         let len = decode_length(i, &mut index)?;
-        if i.len() < index + len {
-            return Err(ASN1DecodeErr::LengthTooLarge(index + len));
+        let checklen = index.checked_add(len).ok_or(ASN1DecodeErr::LengthTooLarge(len))?;
+        if checklen > i.len()  {
+            return Err(ASN1DecodeErr::Incomplete);
         }
         let body = &i[index .. (index + len)];
 
@@ -419,7 +446,14 @@ fn from_der_(i: &[u8], start_offset: usize)
             }
             Some(0x03) => {
                 let bits = (&body[1..]).to_vec();
-                let nbits = (bits.len() * 8) - (body[0] as usize);
+                let bitcount = bits.len() * 8;
+                let rest = body[0] as usize;
+                if bitcount < rest {
+                    return Err(ASN1DecodeErr::InvalidBitStringLength(
+                        bitcount as isize - rest as isize));
+                }
+
+                let nbits = bitcount - (body[0] as usize);
                 result.push(ASN1Block::BitString(soff, nbits, bits))
             }
             // OCTET STRING
@@ -433,6 +467,9 @@ fn from_der_(i: &[u8], start_offset: usize)
             // OBJECT IDENTIFIER
             Some(0x06) => {
                 let mut value1 = BigUint::zero();
+                if body.len() == 0 {
+                    return Err(ASN1DecodeErr::Incomplete) ;
+                }
                 let mut value2 = BigUint::from_u8(body[0]).unwrap();
                 let mut oidres = Vec::new();
                 let mut bindex = 1;
@@ -450,7 +487,7 @@ fn from_der_(i: &[u8], start_offset: usize)
                 oidres.push(value1);
                 oidres.push(value2);
                 while bindex < body.len() {
-                    oidres.push(decode_base127(body, &mut bindex));
+                    oidres.push(decode_base127(body, &mut bindex)?);
                 }
                 let res = OID(oidres);
 
@@ -533,10 +570,17 @@ fn from_der_(i: &[u8], start_offset: usize)
                     return Err(ASN1DecodeErr::InvalidDateValue(format!("{}",body.len())));
                 }
 
-                let mut v = String::from_iter(body.iter().map(|x| *x as char));
+                let mut v: String = String::from_utf8(body.to_vec())
+                    .map_err(|e| ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))?;
+                // Make sure the string is ascii, otherwise we cannot insert
+                // chars at specific bytes.
+                if !v.is_ascii() {
+                    return Err(ASN1DecodeErr::InvalidDateValue(v));
+                }
+
                 // We need to add padding back to the string if it's not there.
-                if v.find('.').is_none() {
-                    v.insert(15, '.')
+                if !v.contains('.') {
+                    v.insert(14, '.')
                 }
                 while v.len() < 25 {
                     let idx = v.len() - 1;
@@ -584,46 +628,57 @@ fn from_der_(i: &[u8], start_offset: usize)
 }
 
 /// Returns the tag, if the type is constructed and the class.
-fn decode_tag(i: &[u8], index: &mut usize) -> (BigUint, bool, ASN1Class) {
+fn decode_tag(i: &[u8], index: &mut usize) -> Result<(BigUint, bool, ASN1Class),ASN1DecodeErr> {
+    if *index >= i.len() {
+        return Err(ASN1DecodeErr::Incomplete) ;
+    }
     let tagbyte = i[*index];
     let constructed = (tagbyte & 0b0010_0000) != 0;
-    let class   = decode_class(tagbyte);
+    let class   = decode_class(tagbyte)?;
     let basetag = tagbyte & 0b1_1111;
 
     *index += 1;
+
     if basetag == 0b1_1111 {
-        let res = decode_base127(i, index);
-        (res, constructed, class)
+        let res = decode_base127(i, index)?;
+        Ok((res, constructed, class))
     } else {
-        (BigUint::from(basetag), constructed, class)
+        Ok((BigUint::from(basetag), constructed, class))
     }
 }
 
-fn decode_base127(i: &[u8], index: &mut usize) -> BigUint {
+fn decode_base127(i: &[u8], index: &mut usize) -> Result<BigUint,ASN1DecodeErr> {
     let mut res = BigUint::zero();
 
     loop {
+        if *index >= i.len() {
+            return Err(ASN1DecodeErr::Incomplete) ;
+        }
+
         let nextbyte = i[*index];
 
         *index += 1;
         res = (res << 7) + BigUint::from(nextbyte & 0x7f);
         if (nextbyte & 0x80) == 0 {
-            return res;
+            return Ok(res);
         }
     }
 }
 
-fn decode_class(i: u8) -> ASN1Class {
+fn decode_class(i: u8) -> Result<ASN1Class,ASN1DecodeErr> {
     match i >> 6 {
-        0b00 => ASN1Class::Universal,
-        0b01 => ASN1Class::Application,
-        0b10 => ASN1Class::ContextSpecific,
-        0b11 => ASN1Class::Private,
-        _    => panic!("The universe is broken.")
+        0b00 => Ok(ASN1Class::Universal),
+        0b01 => Ok(ASN1Class::Application),
+        0b10 => Ok(ASN1Class::ContextSpecific),
+        0b11 => Ok(ASN1Class::Private),
+        _    => Err(ASN1DecodeErr::InvalidClass(i)),
     }
 }
 
 fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
+    if *index >= i.len() {
+        return Err(ASN1DecodeErr::Incomplete) ;
+    }
     let startbyte = i[*index];
 
     // NOTE: Technically, this size can be much larger than a usize.
@@ -640,6 +695,10 @@ fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
         }
 
         while lenlen > 0 {
+            if *index >= i.len() {
+                return Err(ASN1DecodeErr::Incomplete) ;
+            }
+
             res = (res << 8) + (i[*index] as usize);
 
             *index += 1;
@@ -1071,11 +1130,11 @@ mod tests {
 
     quickcheck! {
         fn class_encdec_roundtrips(c: ASN1Class) -> bool {
-            c == decode_class(encode_class(c.clone()))
+            c == decode_class(encode_class(c.clone())).unwrap()
         }
 
         fn class_decenc_roundtrips(v: u8) -> bool {
-            (v & 0b11000000) == encode_class(decode_class(v))
+            (v & 0b11000000) == encode_class(decode_class(v).unwrap())
         }
     }
 
@@ -1095,7 +1154,7 @@ mod tests {
         fn tags_encdec_roundtrips(c: ASN1Class, con: bool, t: RandomUint) -> bool {
             let bytes = encode_tag(c, con, &t.x);
             let mut zero = 0;
-            let (t2, con2, c2) = decode_tag(&bytes[..], &mut zero);
+            let (t2, con2, c2) = decode_tag(&bytes[..], &mut zero).unwrap();
             (c == c2) && (con == con2) && (t.x == t2)
         }
 
@@ -1417,7 +1476,7 @@ mod tests {
 
     #[test]
     fn x509_tests() {
-        assert!(can_parse("test/server.bin").is_ok());
-        assert!(can_parse("test/key.bin").is_ok());
+        can_parse("test/server.bin").unwrap();
+        can_parse("test/key.bin").unwrap();
     }
 }
