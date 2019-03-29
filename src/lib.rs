@@ -1391,6 +1391,21 @@ mod tests {
                 resvec.remove(0);
                 resvec.remove(0);
                 assert_eq!(String::from_utf8(resvec).unwrap(), s);
+                match from_der_(vec, 0) {
+                    Err(_) =>
+                        assert_eq!(format!("Broken [reparse]: {}", d), s),
+                    Ok(mut vec) => {
+                        assert_eq!(vec.len(), 1);
+                        match vec.pop() {
+                            None =>
+                                assert!(false, "The world's gone mad again."),
+                            Some(ASN1Block::GeneralizedTime(_, d2)) =>
+                                assert_eq!(&d2, d),
+                            Some(_) =>
+                                assert!(false, "Bad reparse of GeneralizedTime.")
+                        }
+                    }
+                }
             }
         }
     }
