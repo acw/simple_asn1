@@ -983,6 +983,11 @@ fn encode_base127(v: &BigUint) -> Vec<u8> {
     let u128 = BigUint::from_u8(128).unwrap();
     let zero = BigUint::zero();
 
+    if acc == zero {
+        res.push(0);
+        return res;
+    }
+
     while acc > zero {
         // we build this vector backwards
         let digit = &acc % &u128;
@@ -1493,5 +1498,13 @@ mod tests {
     fn x509_tests() {
         can_parse("test/server.bin").unwrap();
         can_parse("test/key.bin").unwrap();
+    }
+
+    #[test]
+    fn encode_base127_zero() {
+        let zero = BigUint::from(0 as u64);
+        let encoded = encode_base127(&zero);
+        let expected: Vec::<u8> = vec![0x0];
+        assert_eq!(expected, encoded);
     }
 }
