@@ -230,6 +230,44 @@ impl OID {
     pub fn new(x: Vec<BigUint>) -> OID {
         OID(x)
     }
+
+    /// converts the
+    pub fn as_raw(&self) -> Result<Vec<u8>, ASN1EncodeErr> {
+        match (self.0.get(0), self.0.get(1)) {
+            (Some(v1), Some(v2)) => {
+                let two = BigUint::from_u8(2).unwrap();
+
+                // first, validate that the first two items meet spec
+                if v1 > &two {
+                    return Err(ASN1EncodeErr::ObjectIdentVal1TooLarge);
+                }
+
+                let u175 = BigUint::from_u8(175).unwrap();
+                let u39 = BigUint::from_u8(39).unwrap();
+                let bound = if v1 == &two { u175 } else { u39 };
+
+                if v2 > &bound {
+                    return Err(ASN1EncodeErr::ObjectIdentVal2TooLarge);
+                }
+
+                // the following unwraps must be safe, based on the
+                // validation above.
+                let value1 = v1.to_u8().unwrap();
+                let value2 = v2.to_u8().unwrap();
+                let byte1 = (value1 * 40) + value2;
+
+                // now we can build all the rest of the body
+                let mut body = vec![byte1];
+                for num in self.0.iter().skip(2) {
+                    let mut local = encode_base127(&num);
+                    body.append(&mut local);
+                }
+
+                Ok(body)
+            }
+            _ => Err(ASN1EncodeErr::ObjectIdentHasTooFewFields),
+        }
+    }
 }
 
 impl<'a> PartialEq<OID> for &'a OID {
@@ -1529,7 +1567,79 @@ mod tests {
     fn encode_base127_zero() {
         let zero = BigUint::from(0 as u64);
         let encoded = encode_base127(&zero);
-        let expected: Vec::<u8> = vec![0x0];
+        let expected: Vec<u8> = vec![0x0];
         assert_eq!(expected, encoded);
+    }
+
+    #[test]
+    fn raw_oid_eq() {
+        // data taken from https://tools.ietf.org/html/rfc4880
+        // ( OID as vector of unsigned integers , asn1 encoded block)
+
+        // comparision is not done against the full length, but only for
+        // the actually encoded OID part (see the expect statement further down)
+        let md5 = (
+            oid!(1, 2, 840, 113549, 2, 5),
+            vec![
+                0x30, 0x20, 0x30, 0x0C, 0x06, 0x08, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x02, 0x05,
+                0x05, 0x00, 0x04, 0x10,
+            ],
+        );
+
+        let ripmed160 = (
+            oid!(1, 3, 36, 3, 2, 1),
+            vec![
+                0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2B, 0x24, 0x03, 0x02, 0x01, 0x05, 0x00, 0x04,
+                0x14,
+            ],
+        );
+
+        let sha1 = (
+            oid!(1, 3, 14, 3, 2, 26),
+            vec![
+                0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0E, 0x03, 0x02, 0x1A, 0x05, 0x00, 0x04,
+                0x14,
+            ],
+        );
+
+        let sha224 = (
+            oid!(2, 16, 840, 1, 101, 3, 4, 2, 4),
+            vec![
+                0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+                0x04, 0x05, 0x00, 0x04, 0x1C,
+            ],
+        );
+
+        let sha256 = (
+            oid!(2, 16, 840, 1, 101, 3, 4, 2, 1),
+            vec![
+                0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+                0x01, 0x05, 0x00, 0x04, 0x20,
+            ],
+        );
+
+        let sha384 = (
+            oid!(2, 16, 840, 1, 101, 3, 4, 2, 2),
+            vec![
+                0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+                0x02, 0x05, 0x00, 0x04, 0x30,
+            ],
+        );
+
+        let sha512 = (
+            oid!(2, 16, 840, 1, 101, 3, 4, 2, 3),
+            vec![
+                0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+                0x03, 0x05, 0x00, 0x04, 0x40,
+            ],
+        );
+
+        let tests: Vec<(OID, Vec<u8>)> = vec![md5, ripmed160, sha1, sha224, sha256, sha384, sha512];
+
+        for test in tests {
+            let expected = test.1;
+            let raw_oid = test.0.as_raw().expect("Failed to convert OID to raw");
+            assert_eq!(raw_oid, &expected[6..(expected.len() - 4)]);
+        }
     }
 }
