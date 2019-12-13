@@ -339,11 +339,11 @@ impl Error for ASN1DecodeErr {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 
-    fn source(&self) -> Option<&(Error + 'static)> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
 }
@@ -374,11 +374,11 @@ impl Error for ASN1EncodeErr {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<& dyn Error> {
         None
     }
 
-    fn source(&self) -> Option<&(Error + 'static)> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
 }
@@ -523,7 +523,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             // PRINTABLE STRING
             Some(0x13) => {
                 let mut res = String::new();
-                let mut val = body.iter().map(|x| *x as char);
+                let val = body.iter().map(|x| *x as char);
 
                 for c in val {
                     if PRINTABLE_CHARS.contains(c) {
