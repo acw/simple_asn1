@@ -35,9 +35,9 @@ extern crate quickcheck;
 #[cfg(test)]
 extern crate rand;
 
-use chrono::{DateTime,TimeZone,Utc};
-pub use num_bigint::{BigInt,BigUint};
-use num_traits::{FromPrimitive,One,ToPrimitive,Zero};
+use chrono::{DateTime, TimeZone, Utc};
+pub use num_bigint::{BigInt, BigUint};
+use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 use std::error::Error;
 use std::fmt;
 use std::iter::FromIterator;
@@ -48,8 +48,13 @@ use std::str::Utf8Error;
 ///
 /// I'm not sure if/when these are used, but here they are in case you want
 /// to do something with them.
-#[derive(Clone,Copy,Debug,PartialEq)]
-pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ASN1Class {
+    Universal,
+    Application,
+    ContextSpecific,
+    Private,
+}
 
 /// A primitive block from ASN.1.
 ///
@@ -68,7 +73,7 @@ pub enum ASN1Class { Universal, Application, ContextSpecific, Private }
 /// The class of all other variants is `Universal`.
 ///
 /// [`ASN1Class`]: enum.ASN1Class.html
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub enum ASN1Block {
     Boolean(usize, bool),
     Integer(usize, BigInt),
@@ -97,7 +102,7 @@ pub enum ASN1Block {
     ///
     /// The parameters are `class`, `constructed`, `offset`, `tag` and
     /// `content`.
-    Unknown(ASN1Class, bool, usize, BigUint, Vec<u8>)
+    Unknown(ASN1Class, bool, usize, BigUint, Vec<u8>),
 }
 
 impl ASN1Block {
@@ -216,7 +221,7 @@ impl PartialEq for ASN1Block {
 }
 
 /// An ASN.1 OID.
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OID(Vec<BigUint>);
 
 impl OID {
@@ -233,7 +238,7 @@ impl<'a> PartialEq<OID> for &'a OID {
         let &OID(ref vec2) = v2;
 
         if vec1.len() != vec2.len() {
-            return false
+            return false;
         }
 
         for i in 0..vec1.len() {
@@ -263,10 +268,10 @@ macro_rules! oid {
 }
 
 const PRINTABLE_CHARS: &'static str =
-  "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
+    "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
 
 /// An error that can arise decoding ASN.1 primitive blocks.
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ASN1DecodeErr {
     EmptyBuffer,
     BadBooleanLength(usize),
@@ -349,11 +354,11 @@ impl Error for ASN1DecodeErr {
 }
 
 /// An error that can arise encoding ASN.1 primitive blocks.
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ASN1EncodeErr {
     ObjectIdentHasTooFewFields,
     ObjectIdentVal1TooLarge,
-    ObjectIdentVal2TooLarge
+    ObjectIdentVal2TooLarge,
 }
 
 impl fmt::Display for ASN1EncodeErr {
@@ -374,7 +379,7 @@ impl Error for ASN1EncodeErr {
         }
     }
 
-    fn cause(&self) -> Option<& dyn Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 
@@ -385,26 +390,26 @@ impl Error for ASN1EncodeErr {
 
 /// Translate a binary blob into a series of `ASN1Block`s, or provide an
 /// error if it didn't work.
-pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
+pub fn from_der(i: &[u8]) -> Result<Vec<ASN1Block>, ASN1DecodeErr> {
     from_der_(i, 0)
 }
 
-fn from_der_(i: &[u8], start_offset: usize)
-    -> Result<Vec<ASN1Block>,ASN1DecodeErr>
-{
+fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1DecodeErr> {
     let mut result: Vec<ASN1Block> = Vec::new();
-    let mut index:  usize          = 0;
-    let     len                    = i.len();
+    let mut index: usize = 0;
+    let len = i.len();
 
     while index < len {
         let soff = start_offset + index;
         let (tag, constructed, class) = decode_tag(i, &mut index)?;
         let len = decode_length(i, &mut index)?;
-        let checklen = index.checked_add(len).ok_or(ASN1DecodeErr::LengthTooLarge(len))?;
-        if checklen > i.len()  {
+        let checklen = index
+            .checked_add(len)
+            .ok_or(ASN1DecodeErr::LengthTooLarge(len))?;
+        if checklen > i.len() {
             return Err(ASN1DecodeErr::Incomplete);
         }
-        let body = &i[index .. (index + len)];
+        let body = &i[index..(index + len)];
 
         if class != ASN1Class::Universal {
             if constructed {
@@ -412,8 +417,12 @@ fn from_der_(i: &[u8], start_offset: usize)
                 match from_der_(body, start_offset + index) {
                     Ok(mut items) => {
                         if items.len() == 1 {
-                            result.push(ASN1Block::Explicit(class, soff, tag,
-                                Box::new(items.remove(0))));
+                            result.push(ASN1Block::Explicit(
+                                class,
+                                soff,
+                                tag,
+                                Box::new(items.remove(0)),
+                            ));
                             index += len;
                             continue;
                         }
@@ -421,7 +430,13 @@ fn from_der_(i: &[u8], start_offset: usize)
                     Err(_) => {}
                 }
             }
-            result.push(ASN1Block::Unknown(class, constructed, soff, tag, body.to_vec()));
+            result.push(ASN1Block::Unknown(
+                class,
+                constructed,
+                soff,
+                tag,
+                body.to_vec(),
+            ));
             index += len;
             continue;
         }
@@ -450,7 +465,8 @@ fn from_der_(i: &[u8], start_offset: usize)
                 let rest = body[0] as usize;
                 if bitcount < rest {
                     return Err(ASN1DecodeErr::InvalidBitStringLength(
-                        bitcount as isize - rest as isize));
+                        bitcount as isize - rest as isize,
+                    ));
                 }
 
                 let nbits = bitcount - (body[0] as usize);
@@ -468,7 +484,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             Some(0x06) => {
                 let mut value1 = BigUint::zero();
                 if body.len() == 0 {
-                    return Err(ASN1DecodeErr::Incomplete) ;
+                    return Err(ASN1DecodeErr::Incomplete);
                 }
                 let mut value2 = BigUint::from_u8(body[0]).unwrap();
                 let mut oidres = Vec::new();
@@ -552,7 +568,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             // UTCTime
             Some(0x17) => {
                 if body.len() != 13 {
-                    return Err(ASN1DecodeErr::InvalidDateValue(format!("{}",body.len())));
+                    return Err(ASN1DecodeErr::InvalidDateValue(format!("{}", body.len())));
                 }
 
                 let v = String::from_iter(body.iter().map(|x| *x as char));
@@ -567,7 +583,7 @@ fn from_der_(i: &[u8], start_offset: usize)
             // GeneralizedTime
             Some(0x18) => {
                 if body.len() < 15 {
-                    return Err(ASN1DecodeErr::InvalidDateValue(format!("{}",body.len())));
+                    return Err(ASN1DecodeErr::InvalidDateValue(format!("{}", body.len())));
                 }
 
                 let mut v: String = String::from_utf8(body.to_vec())
@@ -628,13 +644,13 @@ fn from_der_(i: &[u8], start_offset: usize)
 }
 
 /// Returns the tag, if the type is constructed and the class.
-fn decode_tag(i: &[u8], index: &mut usize) -> Result<(BigUint, bool, ASN1Class),ASN1DecodeErr> {
+fn decode_tag(i: &[u8], index: &mut usize) -> Result<(BigUint, bool, ASN1Class), ASN1DecodeErr> {
     if *index >= i.len() {
-        return Err(ASN1DecodeErr::Incomplete) ;
+        return Err(ASN1DecodeErr::Incomplete);
     }
     let tagbyte = i[*index];
     let constructed = (tagbyte & 0b0010_0000) != 0;
-    let class   = decode_class(tagbyte)?;
+    let class = decode_class(tagbyte)?;
     let basetag = tagbyte & 0b1_1111;
 
     *index += 1;
@@ -647,12 +663,12 @@ fn decode_tag(i: &[u8], index: &mut usize) -> Result<(BigUint, bool, ASN1Class),
     }
 }
 
-fn decode_base127(i: &[u8], index: &mut usize) -> Result<BigUint,ASN1DecodeErr> {
+fn decode_base127(i: &[u8], index: &mut usize) -> Result<BigUint, ASN1DecodeErr> {
     let mut res = BigUint::zero();
 
     loop {
         if *index >= i.len() {
-            return Err(ASN1DecodeErr::Incomplete) ;
+            return Err(ASN1DecodeErr::Incomplete);
         }
 
         let nextbyte = i[*index];
@@ -665,7 +681,7 @@ fn decode_base127(i: &[u8], index: &mut usize) -> Result<BigUint,ASN1DecodeErr> 
     }
 }
 
-fn decode_class(i: u8) -> Result<ASN1Class,ASN1DecodeErr> {
+fn decode_class(i: u8) -> Result<ASN1Class, ASN1DecodeErr> {
     match i >> 6 {
         0b00 => Ok(ASN1Class::Universal),
         0b01 => Ok(ASN1Class::Application),
@@ -675,9 +691,9 @@ fn decode_class(i: u8) -> Result<ASN1Class,ASN1DecodeErr> {
     }
 }
 
-fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
+fn decode_length(i: &[u8], index: &mut usize) -> Result<usize, ASN1DecodeErr> {
     if *index >= i.len() {
-        return Err(ASN1DecodeErr::Incomplete) ;
+        return Err(ASN1DecodeErr::Incomplete);
     }
     let startbyte = i[*index];
 
@@ -696,7 +712,7 @@ fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
 
         while lenlen > 0 {
             if *index >= i.len() {
-                return Err(ASN1DecodeErr::Incomplete) ;
+                return Err(ASN1DecodeErr::Incomplete);
             }
 
             res = (res << 8) + (i[*index] as usize);
@@ -713,7 +729,7 @@ fn decode_length(i: &[u8], index: &mut usize) -> Result<usize,ASN1DecodeErr> {
 
 /// Given an `ASN1Block`, covert it to its DER encoding, or return an error
 /// if something broke along the way.
-pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
+pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
     match i {
         // BOOLEAN
         &ASN1Block::Boolean(_, val) => {
@@ -727,7 +743,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
         &ASN1Block::Integer(_, ref int) => {
             let mut base = int.to_signed_bytes_be();
             let mut lenbytes = encode_len(base.len());
-            let     inttag   = BigUint::from_u8(0x02).unwrap();
+            let inttag = BigUint::from_u8(0x02).unwrap();
             let mut tagbytes = encode_tag(ASN1Class::Universal, false, &inttag);
 
             let mut result = Vec::new();
@@ -746,7 +762,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
                 Ok(tagbytes)
             } else {
                 let mut lenbytes = encode_len(vs.len() + 1);
-                let     nbits    = (vs.len() * 8) - bits;
+                let nbits = (vs.len() * 8) - bits;
 
                 let mut result = Vec::new();
                 result.append(&mut tagbytes);
@@ -931,19 +947,24 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>,ASN1EncodeErr> {
     }
 }
 
-fn encode_asn1_string(tag: u8, force_chars: bool, c: ASN1Class, s: &String)
-    -> Result<Vec<u8>,ASN1EncodeErr>
-{
-    let mut body = { if force_chars {
-                         let mut out = Vec::new();
+fn encode_asn1_string(
+    tag: u8,
+    force_chars: bool,
+    c: ASN1Class,
+    s: &String,
+) -> Result<Vec<u8>, ASN1EncodeErr> {
+    let mut body = {
+        if force_chars {
+            let mut out = Vec::new();
 
-                         for c in s.chars() {
-                             out.push(c as u8);
-                         }
-                         out
-                     } else {
-                         s.clone().into_bytes()
-                     } };
+            for c in s.chars() {
+                out.push(c as u8);
+            }
+            out
+        } else {
+            s.clone().into_bytes()
+        }
+    };
     let inttag = BigUint::from_u8(tag).unwrap();
     let mut lenbytes = encode_len(body.len());
     let mut tagbytes = encode_tag(c, false, &inttag);
@@ -961,7 +982,7 @@ fn encode_tag(c: ASN1Class, constructed: bool, t: &BigUint) -> Vec<u8> {
     match t.to_u8() {
         Some(mut x) if x < 31 => {
             if constructed {
-                  x |= 0b0010_0000;
+                x |= 0b0010_0000;
             }
             vec![cbyte | x]
         }
@@ -969,7 +990,7 @@ fn encode_tag(c: ASN1Class, constructed: bool, t: &BigUint) -> Vec<u8> {
             let mut res = encode_base127(t);
             let mut x = cbyte | 0b0001_1111;
             if constructed {
-                  x |= 0b0010_0000;
+                x |= 0b0010_0000;
             }
             res.insert(0, x);
             res
@@ -1045,39 +1066,40 @@ fn encode_len(x: usize) -> Vec<u8> {
 /// A trait defining types that can be decoded from an `ASN1Block` stream,
 /// assuming they also have access to the underlying bytes making up the
 /// stream.
-pub trait FromASN1WithBody : Sized {
-    type Error : From<ASN1DecodeErr>;
+pub trait FromASN1WithBody: Sized {
+    type Error: From<ASN1DecodeErr>;
 
-    fn from_asn1_with_body<'a>(v: &'a[ASN1Block], _b: &[u8])
-        -> Result<(Self,&'a[ASN1Block]),Self::Error>;
+    fn from_asn1_with_body<'a>(
+        v: &'a [ASN1Block],
+        _b: &[u8],
+    ) -> Result<(Self, &'a [ASN1Block]), Self::Error>;
 }
 
 /// A trait defining types that can be decoded from an `ASN1Block` stream.
 /// Any member of this trait is also automatically a member of
 /// `FromASN1WithBody`, as it can obviously just ignore the body.
-pub trait FromASN1 : Sized {
-    type Error : From<ASN1DecodeErr>;
+pub trait FromASN1: Sized {
+    type Error: From<ASN1DecodeErr>;
 
-    fn from_asn1(v: &[ASN1Block])
-        -> Result<(Self,&[ASN1Block]),Self::Error>;
+    fn from_asn1(v: &[ASN1Block]) -> Result<(Self, &[ASN1Block]), Self::Error>;
 }
 
 impl<T: FromASN1> FromASN1WithBody for T {
     type Error = T::Error;
 
-    fn from_asn1_with_body<'a>(v: &'a[ASN1Block], _b: &[u8])
-        -> Result<(T,&'a[ASN1Block]),T::Error>
-    {
+    fn from_asn1_with_body<'a>(
+        v: &'a [ASN1Block],
+        _b: &[u8],
+    ) -> Result<(T, &'a [ASN1Block]), T::Error> {
         T::from_asn1(v)
     }
 }
 
 /// Automatically decode a type via DER encoding, assuming that the type
 /// is a member of `FromASN1` or `FromASN1WithBody`.
-pub fn der_decode<T: FromASN1WithBody>(v: &[u8]) -> Result<T,T::Error>
-{
+pub fn der_decode<T: FromASN1WithBody>(v: &[u8]) -> Result<T, T::Error> {
     let vs = from_der(v)?;
-    T::from_asn1_with_body(&vs, v).and_then(|(a,_)| Ok(a))
+    T::from_asn1_with_body(&vs, v).and_then(|(a, _)| Ok(a))
 }
 
 /// The set of types that can automatically converted into a sequence
@@ -1086,19 +1108,17 @@ pub fn der_decode<T: FromASN1WithBody>(v: &[u8]) -> Result<T,T::Error>
 /// `ASN1Class::Universal` as the tag to use, which should be good for
 /// most people.
 pub trait ToASN1 {
-    type Error : From<ASN1EncodeErr>;
+    type Error: From<ASN1EncodeErr>;
 
-    fn to_asn1(&self) -> Result<Vec<ASN1Block>,Self::Error> {
+    fn to_asn1(&self) -> Result<Vec<ASN1Block>, Self::Error> {
         self.to_asn1_class(ASN1Class::Universal)
     }
-    fn to_asn1_class(&self, c: ASN1Class)
-        -> Result<Vec<ASN1Block>,Self::Error>;
+    fn to_asn1_class(&self, c: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error>;
 }
 
 /// Automatically encode a type into binary via DER encoding, assuming
 /// that the type is a member of `ToASN1`.
-pub fn der_encode<T: ToASN1>(v: &T) -> Result<Vec<u8>,T::Error>
-{
+pub fn der_encode<T: ToASN1>(v: &T) -> Result<Vec<u8>, T::Error> {
     let blocks = T::to_asn1(&v)?;
     let mut res = Vec::new();
 
@@ -1114,12 +1134,12 @@ pub fn der_encode<T: ToASN1>(v: &T) -> Result<Vec<u8>,T::Error>
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use chrono::offset::LocalResult;
-    use quickcheck::{Arbitrary,Gen};
+    use quickcheck::{Arbitrary, Gen};
+    use rand::{distributions::Standard, Rng};
     use std::fs::File;
     use std::io::Read;
-    use rand::{Rng, distributions::Standard};
-    use super::*;
 
     impl Arbitrary for ASN1Class {
         fn arbitrary<G: Gen>(g: &mut G) -> ASN1Class {
@@ -1128,7 +1148,7 @@ mod tests {
                 1 => ASN1Class::ContextSpecific,
                 2 => ASN1Class::Universal,
                 3 => ASN1Class::Application,
-                _ => panic!("I weep for a broken life.")
+                _ => panic!("I weep for a broken life."),
             }
         }
     }
@@ -1143,19 +1163,19 @@ mod tests {
         }
     }
 
-    #[derive(Clone,Debug)]
+    #[derive(Clone, Debug)]
     struct RandomUint {
-        x: BigUint
+        x: BigUint,
     }
 
     impl Arbitrary for RandomUint {
         fn arbitrary<G: Gen>(g: &mut G) -> RandomUint {
             let v = BigUint::from_u32(g.gen::<u32>()).unwrap();
-            RandomUint{ x: v }
+            RandomUint { x: v }
         }
     }
 
-   quickcheck! {
+    quickcheck! {
         fn tags_encdec_roundtrips(c: ASN1Class, con: bool, t: RandomUint) -> bool {
             let bytes = encode_tag(c, con, &t.x);
             let mut zero = 0;
@@ -1173,15 +1193,15 @@ mod tests {
         }
     }
 
-    #[derive(Clone,Debug)]
+    #[derive(Clone, Debug)]
     struct RandomInt {
-        x: BigInt
+        x: BigInt,
     }
 
     impl Arbitrary for RandomInt {
         fn arbitrary<G: Gen>(g: &mut G) -> RandomInt {
             let v = BigInt::from_i64(g.gen::<i64>()).unwrap();
-            RandomInt{ x: v }
+            RandomInt { x: v }
         }
     }
 
@@ -1202,9 +1222,11 @@ mod tests {
         let size = g.gen::<u16>() as usize % 16;
         let maxbits = (size as usize) * 8;
         let modbits = g.gen::<u8>() as usize % 8;
-        let nbits = if modbits > maxbits
-                      { maxbits }
-                    else { maxbits - modbits };
+        let nbits = if modbits > maxbits {
+            maxbits
+        } else {
+            maxbits - modbits
+        };
         let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
         ASN1Block::BitString(0, nbits, bytes)
     }
@@ -1221,13 +1243,13 @@ mod tests {
 
     impl Arbitrary for OID {
         fn arbitrary<G: Gen>(g: &mut G) -> OID {
-            let     count = g.gen_range::<usize>(0, 40);
-            let     val1  = g.gen::<u8>() % 3;
-            let     v2mod = if val1 == 2 { 176 } else { 40 };
-            let     val2  = g.gen::<u8>() % v2mod;
-            let     v1    = BigUint::from_u8(val1).unwrap();
-            let     v2    = BigUint::from_u8(val2).unwrap();
-            let mut nums  = vec![v1, v2];
+            let count = g.gen_range::<usize>(0, 40);
+            let val1 = g.gen::<u8>() % 3;
+            let v2mod = if val1 == 2 { 176 } else { 40 };
+            let val2 = g.gen::<u8>() % v2mod;
+            let v1 = BigUint::from_u8(val1).unwrap();
+            let v2 = BigUint::from_u8(val2).unwrap();
+            let mut nums = vec![v1, v2];
 
             for _ in 0..count {
                 let num = RandomUint::arbitrary(g);
@@ -1239,7 +1261,7 @@ mod tests {
     }
 
     fn arb_objid<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let oid   = OID::arbitrary(g);
+        let oid = OID::arbitrary(g);
         ASN1Block::ObjectIdentifier(0, oid)
     }
 
@@ -1310,39 +1332,39 @@ mod tests {
 
     fn arb_utc<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         loop {
-            let y = g.gen_range::<i32>(1970,2069);
-            let m = g.gen_range::<u32>(1,13);
-            let d = g.gen_range::<u32>(1,32);
-            match Utc.ymd_opt(y,m,d) {
+            let y = g.gen_range::<i32>(1970, 2069);
+            let m = g.gen_range::<u32>(1, 13);
+            let d = g.gen_range::<u32>(1, 32);
+            match Utc.ymd_opt(y, m, d) {
                 LocalResult::None => {}
                 LocalResult::Single(d) => {
-                    let h = g.gen_range::<u32>(0,24);
-                    let m = g.gen_range::<u32>(0,60);
-                    let s = g.gen_range::<u32>(0,60);
-                    let t = d.and_hms(h,m,s);
+                    let h = g.gen_range::<u32>(0, 24);
+                    let m = g.gen_range::<u32>(0, 60);
+                    let s = g.gen_range::<u32>(0, 60);
+                    let t = d.and_hms(h, m, s);
                     return ASN1Block::UTCTime(0, t);
                 }
-                LocalResult::Ambiguous(_,_) => {}
+                LocalResult::Ambiguous(_, _) => {}
             }
         }
     }
 
     fn arb_time<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         loop {
-            let y = g.gen_range::<i32>(0,10000);
-            let m = g.gen_range::<u32>(1,13);
-            let d = g.gen_range::<u32>(1,32);
-            match Utc.ymd_opt(y,m,d) {
+            let y = g.gen_range::<i32>(0, 10000);
+            let m = g.gen_range::<u32>(1, 13);
+            let d = g.gen_range::<u32>(1, 32);
+            match Utc.ymd_opt(y, m, d) {
                 LocalResult::None => {}
                 LocalResult::Single(d) => {
-                    let h = g.gen_range::<u32>(0,24);
-                    let m = g.gen_range::<u32>(0,60);
-                    let s = g.gen_range::<u32>(0,60);
-                    let n = g.gen_range::<u32>(0,1000000000);
-                    let t = d.and_hms_nano(h,m,s,n);
+                    let h = g.gen_range::<u32>(0, 24);
+                    let m = g.gen_range::<u32>(0, 60);
+                    let s = g.gen_range::<u32>(0, 60);
+                    let n = g.gen_range::<u32>(0, 1000000000);
+                    let t = d.and_hms_nano(h, m, s, n);
                     return ASN1Block::GeneralizedTime(0, t);
                 }
-                LocalResult::Ambiguous(_,_) => {}
+                LocalResult::Ambiguous(_, _) => {}
             }
         }
     }
@@ -1353,38 +1375,39 @@ mod tests {
             // Universal is invalid for an explicitly tagged block
             class = ASN1Class::ContextSpecific;
         }
-        let tag   = RandomUint::arbitrary(g);
-        let item  = limited_arbitrary(g, d - 1);
+        let tag = RandomUint::arbitrary(g);
+        let item = limited_arbitrary(g, d - 1);
 
         ASN1Block::Explicit(class, 0, tag.x, Box::new(item))
     }
 
     fn arb_unknown<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         let class = ASN1Class::arbitrary(g);
-        let tag   = RandomUint::arbitrary(g);
-        let size  = g.gen_range::<usize>(0, 128);
+        let tag = RandomUint::arbitrary(g);
+        let size = g.gen_range::<usize>(0, 128);
         let items = g.sample_iter::<u8, _>(&Standard).take(size).collect();
 
         ASN1Block::Unknown(class, false, 0, tag.x, items)
     }
 
     fn limited_arbitrary<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let mut possibles: Vec<ASN1BlockGen<G>> =
-            vec![arb_boolean,
-                 arb_integer,
-                 arb_bitstr,
-                 arb_octstr,
-                 arb_null,
-                 arb_objid,
-                 arb_utf8,
-                 arb_print,
-                 arb_tele,
-                 arb_uni,
-                 arb_ia5,
-                 arb_utc,
-                 arb_time,
-                 arb_bmp,
-                 arb_unknown];
+        let mut possibles: Vec<ASN1BlockGen<G>> = vec![
+            arb_boolean,
+            arb_integer,
+            arb_bitstr,
+            arb_octstr,
+            arb_null,
+            arb_objid,
+            arb_utf8,
+            arb_print,
+            arb_tele,
+            arb_uni,
+            arb_ia5,
+            arb_utc,
+            arb_time,
+            arb_bmp,
+            arb_unknown,
+        ];
 
         if d > 0 {
             possibles.push(arb_seq);
@@ -1394,7 +1417,7 @@ mod tests {
 
         match g.choose(&possibles[..]) {
             Some(f) => f(g, d),
-            None    => panic!("Couldn't generate arbitrary value.")
+            None => panic!("Couldn't generate arbitrary value."),
         }
     }
 
@@ -1434,19 +1457,25 @@ mod tests {
         }
     }
 
-    fn result_int(v: i16) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
+    fn result_int(v: i16) -> Result<Vec<ASN1Block>, ASN1DecodeErr> {
         let val = BigInt::from(v);
         Ok(vec![ASN1Block::Integer(0, val)])
     }
 
     #[test]
     fn generalized_time_tests() {
-        check_spec(&Utc.ymd(1992, 5, 21).and_hms(0,0,0),
-                   "19920521000000Z".to_string());
-        check_spec(&Utc.ymd(1992, 6, 22).and_hms(12,34,21),
-                   "19920622123421Z".to_string());
-        check_spec(&Utc.ymd(1992, 7, 22).and_hms_milli(13,21,00,300),
-                   "19920722132100.3Z".to_string());
+        check_spec(
+            &Utc.ymd(1992, 5, 21).and_hms(0, 0, 0),
+            "19920521000000Z".to_string(),
+        );
+        check_spec(
+            &Utc.ymd(1992, 6, 22).and_hms(12, 34, 21),
+            "19920622123421Z".to_string(),
+        );
+        check_spec(
+            &Utc.ymd(1992, 7, 22).and_hms_milli(13, 21, 00, 300),
+            "19920722132100.3Z".to_string(),
+        );
     }
 
     fn check_spec(d: &DateTime<Utc>, s: String) {
@@ -1459,17 +1488,13 @@ mod tests {
                 resvec.remove(0);
                 assert_eq!(String::from_utf8(resvec).unwrap(), s);
                 match from_der_(vec, 0) {
-                    Err(_) =>
-                        assert_eq!(format!("Broken [reparse]: {}", d), s),
+                    Err(_) => assert_eq!(format!("Broken [reparse]: {}", d), s),
                     Ok(mut vec) => {
                         assert_eq!(vec.len(), 1);
                         match vec.pop() {
-                            None =>
-                                assert!(false, "The world's gone mad again."),
-                            Some(ASN1Block::GeneralizedTime(_, d2)) =>
-                                assert_eq!(&d2, d),
-                            Some(_) =>
-                                assert!(false, "Bad reparse of GeneralizedTime.")
+                            None => assert!(false, "The world's gone mad again."),
+                            Some(ASN1Block::GeneralizedTime(_, d2)) => assert_eq!(&d2, d),
+                            Some(_) => assert!(false, "Bad reparse of GeneralizedTime."),
                         }
                     }
                 }
@@ -1479,15 +1504,15 @@ mod tests {
 
     #[test]
     fn base_integer_tests() {
-        assert_eq!(from_der(&vec![0x02,0x01,0x00]), result_int(0));
-        assert_eq!(from_der(&vec![0x02,0x01,0x7F]), result_int(127));
-        assert_eq!(from_der(&vec![0x02,0x02,0x00,0x80]), result_int(128));
-        assert_eq!(from_der(&vec![0x02,0x02,0x01,0x00]), result_int(256));
-        assert_eq!(from_der(&vec![0x02,0x01,0x80]), result_int(-128));
-        assert_eq!(from_der(&vec![0x02,0x02,0xFF,0x7F]), result_int(-129));
+        assert_eq!(from_der(&vec![0x02, 0x01, 0x00]), result_int(0));
+        assert_eq!(from_der(&vec![0x02, 0x01, 0x7F]), result_int(127));
+        assert_eq!(from_der(&vec![0x02, 0x02, 0x00, 0x80]), result_int(128));
+        assert_eq!(from_der(&vec![0x02, 0x02, 0x01, 0x00]), result_int(256));
+        assert_eq!(from_der(&vec![0x02, 0x01, 0x80]), result_int(-128));
+        assert_eq!(from_der(&vec![0x02, 0x02, 0xFF, 0x7F]), result_int(-129));
     }
 
-    fn can_parse(f: &str) -> Result<Vec<ASN1Block>,ASN1DecodeErr> {
+    fn can_parse(f: &str) -> Result<Vec<ASN1Block>, ASN1DecodeErr> {
         let mut fd = File::open(f).unwrap();
         let mut buffer = Vec::new();
         let _amt = fd.read_to_end(&mut buffer);
