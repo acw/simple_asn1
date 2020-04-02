@@ -1642,4 +1642,21 @@ mod tests {
             assert_eq!(raw_oid, &expected[6..(expected.len() - 4)]);
         }
     }
+
+    #[test]
+    fn encode_unknowns() {
+        fn encode_structure(bufs: &[Vec<u8>]) -> Vec<u8> {
+            let mut body = Vec::new();
+            for (i, buf) in bufs.iter().enumerate() {
+                let mut der = to_der(&ASN1Block::Unknown(ASN1Class::ContextSpecific, false, 0, BigUint::from_usize(i).unwrap(), buf.to_vec())).unwrap();
+                body.append(&mut der);
+            }
+            let block = ASN1Block::Unknown(ASN1Class::ContextSpecific, true, 0, BigUint::from_u8(0).unwrap(), body);
+            to_der(&block).unwrap()
+        }
+
+        let decoded = from_der(&encode_structure(&vec![vec![0]])).unwrap();
+        let expected = [ASN1Block::Unknown(ASN1Class::ContextSpecific, true, 0, BigUint::from_u8(0).unwrap(), vec![128, 1, 0])];
+        assert_eq!(decoded, expected);
+    }
 }
