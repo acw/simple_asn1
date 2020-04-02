@@ -401,7 +401,7 @@ pub enum ASN1EncodeErr {
 
 impl fmt::Display for ASN1EncodeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
+        f.write_str(&self.to_string())
     }
 }
 
