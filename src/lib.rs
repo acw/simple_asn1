@@ -401,7 +401,7 @@ pub enum ASN1EncodeErr {
 
 impl fmt::Display for ASN1EncodeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
+        f.write_str(&self.to_string())
     }
 }
 
@@ -1683,5 +1683,22 @@ mod tests {
                         1u8.into(), 7u8.into(),
                     ]))))])]),
         );
+    }
+
+    #[test]
+    fn encode_unknowns() {
+        fn encode_structure(bufs: &[Vec<u8>]) -> Vec<u8> {
+            let mut body = Vec::new();
+            for (i, buf) in bufs.iter().enumerate() {
+                let mut der = to_der(&ASN1Block::Unknown(ASN1Class::ContextSpecific, false, 0, BigUint::from_usize(i).unwrap(), buf.to_vec())).unwrap();
+                body.append(&mut der);
+            }
+            let block = ASN1Block::Unknown(ASN1Class::ContextSpecific, true, 0, BigUint::from_u8(0).unwrap(), body);
+            to_der(&block).unwrap()
+        }
+
+        let decoded = from_der(&encode_structure(&vec![vec![0]])).unwrap();
+        let expected = [ASN1Block::Unknown(ASN1Class::ContextSpecific, true, 0, BigUint::from_u8(0).unwrap(), vec![128, 1, 0])];
+        assert_eq!(decoded, expected);
     }
 }
