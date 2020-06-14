@@ -102,24 +102,24 @@ impl ASN1Block {
     /// kind of block it is.
     pub fn class(&self) -> ASN1Class {
         match self {
-            &ASN1Block::Boolean(_,_)          => ASN1Class::Universal,
-            &ASN1Block::Integer(_,_)          => ASN1Class::Universal,
-            &ASN1Block::BitString(_,_,_)      => ASN1Class::Universal,
-            &ASN1Block::OctetString(_,_)      => ASN1Class::Universal,
-            &ASN1Block::Null(_)               => ASN1Class::Universal,
-            &ASN1Block::ObjectIdentifier(_,_) => ASN1Class::Universal,
-            &ASN1Block::UTF8String(_,_)       => ASN1Class::Universal,
-            &ASN1Block::PrintableString(_,_)  => ASN1Class::Universal,
-            &ASN1Block::TeletexString(_,_)    => ASN1Class::Universal,
-            &ASN1Block::IA5String(_,_)        => ASN1Class::Universal,
-            &ASN1Block::UTCTime(_,_)          => ASN1Class::Universal,
-            &ASN1Block::GeneralizedTime(_,_)  => ASN1Class::Universal,
-            &ASN1Block::UniversalString(_,_)  => ASN1Class::Universal,
-            &ASN1Block::BMPString(_,_)        => ASN1Class::Universal,
-            &ASN1Block::Sequence(_,_)         => ASN1Class::Universal,
-            &ASN1Block::Set(_,_)              => ASN1Class::Universal,
-            &ASN1Block::Explicit(c,_,_,_)     => c,
-            &ASN1Block::Unknown(c,_,_,_,_)    => c,
+            &ASN1Block::Boolean(_, _) => ASN1Class::Universal,
+            &ASN1Block::Integer(_, _) => ASN1Class::Universal,
+            &ASN1Block::BitString(_, _, _) => ASN1Class::Universal,
+            &ASN1Block::OctetString(_, _) => ASN1Class::Universal,
+            &ASN1Block::Null(_) => ASN1Class::Universal,
+            &ASN1Block::ObjectIdentifier(_, _) => ASN1Class::Universal,
+            &ASN1Block::UTF8String(_, _) => ASN1Class::Universal,
+            &ASN1Block::PrintableString(_, _) => ASN1Class::Universal,
+            &ASN1Block::TeletexString(_, _) => ASN1Class::Universal,
+            &ASN1Block::IA5String(_, _) => ASN1Class::Universal,
+            &ASN1Block::UTCTime(_, _) => ASN1Class::Universal,
+            &ASN1Block::GeneralizedTime(_, _) => ASN1Class::Universal,
+            &ASN1Block::UniversalString(_, _) => ASN1Class::Universal,
+            &ASN1Block::BMPString(_, _) => ASN1Class::Universal,
+            &ASN1Block::Sequence(_, _) => ASN1Class::Universal,
+            &ASN1Block::Set(_, _) => ASN1Class::Universal,
+            &ASN1Block::Explicit(c, _, _, _) => c,
+            &ASN1Block::Unknown(c, _, _, _, _) => c,
         }
     }
 
@@ -127,24 +127,24 @@ impl ASN1Block {
     /// of what kind of block it is.
     pub fn offset(&self) -> usize {
         match self {
-            &ASN1Block::Boolean(o,_)          => o,
-            &ASN1Block::Integer(o,_)          => o,
-            &ASN1Block::BitString(o,_,_)      => o,
-            &ASN1Block::OctetString(o,_)      => o,
-            &ASN1Block::Null(o)               => o,
-            &ASN1Block::ObjectIdentifier(o,_) => o,
-            &ASN1Block::UTF8String(o,_)       => o,
-            &ASN1Block::PrintableString(o,_)  => o,
-            &ASN1Block::TeletexString(o,_)    => o,
-            &ASN1Block::IA5String(o,_)        => o,
-            &ASN1Block::UTCTime(o,_)          => o,
-            &ASN1Block::GeneralizedTime(o,_)  => o,
-            &ASN1Block::UniversalString(o,_)  => o,
-            &ASN1Block::BMPString(o,_)        => o,
-            &ASN1Block::Sequence(o,_)         => o,
-            &ASN1Block::Set(o,_)              => o,
-            &ASN1Block::Explicit(_,o,_,_)     => o,
-            &ASN1Block::Unknown(_,_,o,_,_)    => o,
+            &ASN1Block::Boolean(o, _) => o,
+            &ASN1Block::Integer(o, _) => o,
+            &ASN1Block::BitString(o, _, _) => o,
+            &ASN1Block::OctetString(o, _) => o,
+            &ASN1Block::Null(o) => o,
+            &ASN1Block::ObjectIdentifier(o, _) => o,
+            &ASN1Block::UTF8String(o, _) => o,
+            &ASN1Block::PrintableString(o, _) => o,
+            &ASN1Block::TeletexString(o, _) => o,
+            &ASN1Block::IA5String(o, _) => o,
+            &ASN1Block::UTCTime(o, _) => o,
+            &ASN1Block::GeneralizedTime(o, _) => o,
+            &ASN1Block::UniversalString(o, _) => o,
+            &ASN1Block::BMPString(o, _) => o,
+            &ASN1Block::Sequence(o, _) => o,
+            &ASN1Block::Set(o, _) => o,
+            &ASN1Block::Explicit(_, o, _, _) => o,
+            &ASN1Block::Unknown(_, _, o, _, _) => o,
         }
     }
 }
@@ -152,62 +152,43 @@ impl ASN1Block {
 impl PartialEq for ASN1Block {
     fn eq(&self, other: &ASN1Block) -> bool {
         match (self, other) {
-            (&ASN1Block::Boolean(_,a1),
-             &ASN1Block::Boolean(_,a2)) =>
-                (a1 == a2),
-            (&ASN1Block::Integer(_,ref a1),
-             &ASN1Block::Integer(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::BitString(_,a1,ref b1),
-             &ASN1Block::BitString(_,a2,ref b2)) =>
-                (a1 == a2) && (b1 == b2),
-            (&ASN1Block::OctetString(_,ref a1),
-             &ASN1Block::OctetString(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::Null(_),
-             &ASN1Block::Null(_)) =>
-                true,
-            (&ASN1Block::ObjectIdentifier(_,ref a1),
-             &ASN1Block::ObjectIdentifier(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::UTF8String(_,ref a1),
-             &ASN1Block::UTF8String(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::PrintableString(_,ref a1),
-             &ASN1Block::PrintableString(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::TeletexString(_,ref a1),
-             &ASN1Block::TeletexString(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::IA5String(_,ref a1),
-             &ASN1Block::IA5String(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::UTCTime(_,ref a1),
-             &ASN1Block::UTCTime(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::GeneralizedTime(_,ref a1),
-             &ASN1Block::GeneralizedTime(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::UniversalString(_,ref a1),
-             &ASN1Block::UniversalString(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::BMPString(_,ref a1),
-             &ASN1Block::BMPString(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::Sequence(_,ref a1),
-             &ASN1Block::Sequence(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::Set(_,ref a1),
-             &ASN1Block::Set(_,ref a2)) =>
-                (a1 == a2),
-            (&ASN1Block::Explicit(a1,_,ref b1,ref c1),
-             &ASN1Block::Explicit(a2,_,ref b2,ref c2)) =>
-                (a1 == a2) && (b1 == b2) && (c1 == c2),
-            (&ASN1Block::Unknown(a1,b1,_,ref c1,ref d1),
-             &ASN1Block::Unknown(a2,b2,_,ref c2,ref d2)) =>
-                (a1 == a2) && (b1 == b2) && (c1 == c2) && (d1 == d2),
-            _ =>
-                false
+            (&ASN1Block::Boolean(_, a1), &ASN1Block::Boolean(_, a2)) => (a1 == a2),
+            (&ASN1Block::Integer(_, ref a1), &ASN1Block::Integer(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::BitString(_, a1, ref b1), &ASN1Block::BitString(_, a2, ref b2)) => {
+                (a1 == a2) && (b1 == b2)
+            }
+            (&ASN1Block::OctetString(_, ref a1), &ASN1Block::OctetString(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::Null(_), &ASN1Block::Null(_)) => true,
+            (&ASN1Block::ObjectIdentifier(_, ref a1), &ASN1Block::ObjectIdentifier(_, ref a2)) => {
+                (a1 == a2)
+            }
+            (&ASN1Block::UTF8String(_, ref a1), &ASN1Block::UTF8String(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::PrintableString(_, ref a1), &ASN1Block::PrintableString(_, ref a2)) => {
+                (a1 == a2)
+            }
+            (&ASN1Block::TeletexString(_, ref a1), &ASN1Block::TeletexString(_, ref a2)) => {
+                (a1 == a2)
+            }
+            (&ASN1Block::IA5String(_, ref a1), &ASN1Block::IA5String(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::UTCTime(_, ref a1), &ASN1Block::UTCTime(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::GeneralizedTime(_, ref a1), &ASN1Block::GeneralizedTime(_, ref a2)) => {
+                (a1 == a2)
+            }
+            (&ASN1Block::UniversalString(_, ref a1), &ASN1Block::UniversalString(_, ref a2)) => {
+                (a1 == a2)
+            }
+            (&ASN1Block::BMPString(_, ref a1), &ASN1Block::BMPString(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::Sequence(_, ref a1), &ASN1Block::Sequence(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::Set(_, ref a1), &ASN1Block::Set(_, ref a2)) => (a1 == a2),
+            (
+                &ASN1Block::Explicit(a1, _, ref b1, ref c1),
+                &ASN1Block::Explicit(a2, _, ref b2, ref c2),
+            ) => (a1 == a2) && (b1 == b2) && (c1 == c2),
+            (
+                &ASN1Block::Unknown(a1, b1, _, ref c1, ref d1),
+                &ASN1Block::Unknown(a2, b2, _, ref c2, ref d2),
+            ) => (a1 == a2) && (b1 == b2) && (c1 == c2) && (d1 == d2),
+            _ => false,
         }
     }
 }
@@ -321,24 +302,27 @@ pub enum ASN1DecodeErr {
 impl fmt::Display for ASN1DecodeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ASN1DecodeErr::EmptyBuffer =>
-                write!(f, "Encountered an empty buffer decoding ASN1 block."),
-            ASN1DecodeErr::BadBooleanLength(x) =>
-                write!(f, "Bad length field in boolean block: {}", x),
-            ASN1DecodeErr::LengthTooLarge(x) =>
-                write!(f, "Length field too large for object type: {}", x),
-            ASN1DecodeErr::UTF8DecodeFailure(x) =>
-                write!(f, "UTF8 string failed to properly decode: {}", x),
-            ASN1DecodeErr::PrintableStringDecodeFailure =>
-                write!(f, "Printable string failed to properly decode."),
-            ASN1DecodeErr::InvalidDateValue(x) =>
-                write!(f, "Invalid date value: {}", x),
-            ASN1DecodeErr::InvalidBitStringLength(i) =>
-                write!(f, "Invalid length of bit string: {}", i),
-            ASN1DecodeErr::InvalidClass(i) =>
-                write!(f, "Invalid class value: {}", i),
-            ASN1DecodeErr::Incomplete =>
-                write!(f, "Incomplete data or invalid ASN1"),
+            ASN1DecodeErr::EmptyBuffer => {
+                write!(f, "Encountered an empty buffer decoding ASN1 block.")
+            }
+            ASN1DecodeErr::BadBooleanLength(x) => {
+                write!(f, "Bad length field in boolean block: {}", x)
+            }
+            ASN1DecodeErr::LengthTooLarge(x) => {
+                write!(f, "Length field too large for object type: {}", x)
+            }
+            ASN1DecodeErr::UTF8DecodeFailure(x) => {
+                write!(f, "UTF8 string failed to properly decode: {}", x)
+            }
+            ASN1DecodeErr::PrintableStringDecodeFailure => {
+                write!(f, "Printable string failed to properly decode.")
+            }
+            ASN1DecodeErr::InvalidDateValue(x) => write!(f, "Invalid date value: {}", x),
+            ASN1DecodeErr::InvalidBitStringLength(i) => {
+                write!(f, "Invalid length of bit string: {}", i)
+            }
+            ASN1DecodeErr::InvalidClass(i) => write!(f, "Invalid class value: {}", i),
+            ASN1DecodeErr::Incomplete => write!(f, "Incomplete data or invalid ASN1"),
         }
     }
 }
@@ -354,12 +338,15 @@ pub enum ASN1EncodeErr {
 impl fmt::Display for ASN1EncodeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ASN1EncodeErr::ObjectIdentHasTooFewFields =>
-                write!(f,"ASN1 object identifier has too few fields."),
-            ASN1EncodeErr::ObjectIdentVal1TooLarge =>
-                write!(f,"First value in ASN1 OID is too big."),
-            ASN1EncodeErr::ObjectIdentVal2TooLarge =>
-                write!(f,"Second value in ASN1 OID is too big."),
+            ASN1EncodeErr::ObjectIdentHasTooFewFields => {
+                write!(f, "ASN1 object identifier has too few fields.")
+            }
+            ASN1EncodeErr::ObjectIdentVal1TooLarge => {
+                write!(f, "First value in ASN1 OID is too big.")
+            }
+            ASN1EncodeErr::ObjectIdentVal2TooLarge => {
+                write!(f, "Second value in ASN1 OID is too big.")
+            }
         }
     }
 }
@@ -432,9 +419,7 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                 result.push(ASN1Block::Integer(soff, res));
             }
             // BIT STRING
-            Some(0x03) if body.len() == 0 => {
-                result.push(ASN1Block::BitString(soff, 0, Vec::new()))
-            }
+            Some(0x03) if body.len() == 0 => result.push(ASN1Block::BitString(soff, 0, Vec::new())),
             Some(0x03) => {
                 let bits = (&body[1..]).to_vec();
                 let bitcount = bits.len() * 8;
@@ -449,9 +434,7 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                 result.push(ASN1Block::BitString(soff, nbits, bits))
             }
             // OCTET STRING
-            Some(0x04) => {
-                result.push(ASN1Block::OctetString(soff, body.to_vec()))
-            }
+            Some(0x04) => result.push(ASN1Block::OctetString(soff, body.to_vec())),
             // NULL
             Some(0x05) => {
                 result.push(ASN1Block::Null(soff));
@@ -486,32 +469,20 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                 result.push(ASN1Block::ObjectIdentifier(soff, res))
             }
             // UTF8STRING
-            Some(0x0C) => {
-                match String::from_utf8(body.to_vec()) {
-                    Ok(v) =>
-                        result.push(ASN1Block::UTF8String(soff, v)),
-                    Err(e) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
-                }
-            }
+            Some(0x0C) => match String::from_utf8(body.to_vec()) {
+                Ok(v) => result.push(ASN1Block::UTF8String(soff, v)),
+                Err(e) => return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error())),
+            },
             // SEQUENCE
-            Some(0x10) => {
-                match from_der_(body, start_offset + index) {
-                    Ok(items) =>
-                        result.push(ASN1Block::Sequence(soff, items)),
-                    Err(e) =>
-                        return Err(e)
-                }
-            }
+            Some(0x10) => match from_der_(body, start_offset + index) {
+                Ok(items) => result.push(ASN1Block::Sequence(soff, items)),
+                Err(e) => return Err(e),
+            },
             // SET
-            Some(0x11) => {
-                match from_der_(body, start_offset + index) {
-                    Ok(items) =>
-                        result.push(ASN1Block::Set(soff, items)),
-                    Err(e) =>
-                        return Err(e)
-                }
-            }
+            Some(0x11) => match from_der_(body, start_offset + index) {
+                Ok(items) => result.push(ASN1Block::Set(soff, items)),
+                Err(e) => return Err(e),
+            },
             // PRINTABLE STRING
             Some(0x13) => {
                 let mut res = String::new();
@@ -527,14 +498,10 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                 result.push(ASN1Block::PrintableString(soff, res));
             }
             // TELETEX STRINGS
-            Some(0x14) => {
-                match String::from_utf8(body.to_vec()) {
-                    Ok(v) =>
-                        result.push(ASN1Block::TeletexString(soff, v)),
-                    Err(e) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
-                }
-            }
+            Some(0x14) => match String::from_utf8(body.to_vec()) {
+                Ok(v) => result.push(ASN1Block::TeletexString(soff, v)),
+                Err(e) => return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error())),
+            },
             // IA5 (ASCII) STRING
             Some(0x16) => {
                 let val = body.iter().map(|x| *x as char);
@@ -549,11 +516,8 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
 
                 let v = String::from_iter(body.iter().map(|x| *x as char));
                 match Utc.datetime_from_str(&v, "%y%m%d%H%M%SZ") {
-                    Err(_) =>
-                        return Err(ASN1DecodeErr::InvalidDateValue(v)),
-                    Ok(t) => {
-                        result.push(ASN1Block::UTCTime(soff, t))
-                    }
+                    Err(_) => return Err(ASN1DecodeErr::InvalidDateValue(v)),
+                    Ok(t) => result.push(ASN1Block::UTCTime(soff, t)),
                 }
             }
             // GeneralizedTime
@@ -579,34 +543,29 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                     v.insert(idx, '0');
                 }
                 match Utc.datetime_from_str(&v, "%Y%m%d%H%M%S.%fZ") {
-                    Err(_) =>
-                        return Err(ASN1DecodeErr::InvalidDateValue(v)),
-                    Ok(t) => {
-                        result.push(ASN1Block::GeneralizedTime(soff, t))
-                    }
+                    Err(_) => return Err(ASN1DecodeErr::InvalidDateValue(v)),
+                    Ok(t) => result.push(ASN1Block::GeneralizedTime(soff, t)),
                 }
             }
             // UNIVERSAL STRINGS
-            Some(0x1C) => {
-                match String::from_utf8(body.to_vec()) {
-                    Ok(v) =>
-                        result.push(ASN1Block::UniversalString(soff, v)),
-                    Err(e) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
-                }
-            }
+            Some(0x1C) => match String::from_utf8(body.to_vec()) {
+                Ok(v) => result.push(ASN1Block::UniversalString(soff, v)),
+                Err(e) => return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error())),
+            },
             // UNIVERSAL STRINGS
-            Some(0x1E) => {
-                match String::from_utf8(body.to_vec()) {
-                    Ok(v) =>
-                        result.push(ASN1Block::BMPString(soff, v)),
-                    Err(e) =>
-                        return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error()))
-                }
-            }
+            Some(0x1E) => match String::from_utf8(body.to_vec()) {
+                Ok(v) => result.push(ASN1Block::BMPString(soff, v)),
+                Err(e) => return Err(ASN1DecodeErr::UTF8DecodeFailure(e.utf8_error())),
+            },
             // Dunno.
             _ => {
-                result.push(ASN1Block::Unknown(class, constructed, soff, tag, body.to_vec()));
+                result.push(ASN1Block::Unknown(
+                    class,
+                    constructed,
+                    soff,
+                    tag,
+                    body.to_vec(),
+                ));
             }
         }
         index += len;
@@ -663,7 +622,7 @@ fn decode_class(i: u8) -> Result<ASN1Class, ASN1DecodeErr> {
         0b01 => Ok(ASN1Class::Application),
         0b10 => Ok(ASN1Class::ContextSpecific),
         0b11 => Ok(ASN1Class::Private),
-        _    => Err(ASN1DecodeErr::InvalidClass(i)),
+        _ => Err(ASN1DecodeErr::InvalidClass(i)),
     }
 }
 
@@ -775,7 +734,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
 
                     // first, validate that the first two items meet spec
                     if v1 > &two {
-                        return Err(ASN1EncodeErr::ObjectIdentVal1TooLarge)
+                        return Err(ASN1EncodeErr::ObjectIdentVal1TooLarge);
                     }
 
                     let u175 = BigUint::from_u8(175).unwrap();
@@ -790,7 +749,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
                     // validation above.
                     let value1 = v1.to_u8().unwrap();
                     let value2 = v2.to_u8().unwrap();
-                    let byte1  = (value1 * 40) + value2;
+                    let byte1 = (value1 * 40) + value2;
 
                     // now we can build all the rest of the body
                     let mut body = vec![byte1];
@@ -809,9 +768,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
 
                     Ok(result)
                 }
-                _ => {
-                    Err(ASN1EncodeErr::ObjectIdentHasTooFewFields)
-                }
+                _ => Err(ASN1EncodeErr::ObjectIdentHasTooFewFields),
             }
         }
         // SEQUENCE
@@ -886,18 +843,24 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
             res.append(&mut body);
             Ok(res)
         }
-        &ASN1Block::UTF8String(_, ref str)      =>
-            encode_asn1_string(0x0c, false, ASN1Class::Universal, str),
-        &ASN1Block::PrintableString(_, ref str) =>
-            encode_asn1_string(0x13, true,  ASN1Class::Universal, str),
-        &ASN1Block::TeletexString(_, ref str)   =>
-            encode_asn1_string(0x14, false, ASN1Class::Universal, str),
-        &ASN1Block::UniversalString(_, ref str) =>
-            encode_asn1_string(0x1c, false, ASN1Class::Universal, str),
-        &ASN1Block::IA5String(_, ref str)       =>
-            encode_asn1_string(0x16, true,  ASN1Class::Universal, str),
-        &ASN1Block::BMPString(_, ref str)       =>
-            encode_asn1_string(0x1e, false, ASN1Class::Universal, str),
+        &ASN1Block::UTF8String(_, ref str) => {
+            encode_asn1_string(0x0c, false, ASN1Class::Universal, str)
+        }
+        &ASN1Block::PrintableString(_, ref str) => {
+            encode_asn1_string(0x13, true, ASN1Class::Universal, str)
+        }
+        &ASN1Block::TeletexString(_, ref str) => {
+            encode_asn1_string(0x14, false, ASN1Class::Universal, str)
+        }
+        &ASN1Block::UniversalString(_, ref str) => {
+            encode_asn1_string(0x1c, false, ASN1Class::Universal, str)
+        }
+        &ASN1Block::IA5String(_, ref str) => {
+            encode_asn1_string(0x16, true, ASN1Class::Universal, str)
+        }
+        &ASN1Block::BMPString(_, ref str) => {
+            encode_asn1_string(0x1e, false, ASN1Class::Universal, str)
+        }
         &ASN1Block::Explicit(class, _, ref tag, ref item) => {
             let mut tagbytes = encode_tag(class, true, tag);
             let mut bytes = to_der(item)?;
@@ -991,12 +954,9 @@ fn encode_base127(v: &BigUint) -> Vec<u8> {
         acc = acc >> 7;
 
         match digit.to_u8() {
-            None =>
-                panic!("7 bits don't fit into 8, cause ..."),
-            Some(x) if res.is_empty() =>
-                res.push(x),
-            Some(x) =>
-                res.push(x | 0x80)
+            None => panic!("7 bits don't fit into 8, cause ..."),
+            Some(x) if res.is_empty() => res.push(x),
+            Some(x) => res.push(x | 0x80),
         }
     }
 
@@ -1006,13 +966,12 @@ fn encode_base127(v: &BigUint) -> Vec<u8> {
 
 fn encode_class(c: ASN1Class) -> u8 {
     match c {
-        ASN1Class::Universal       => 0b0000_0000,
-        ASN1Class::Application     => 0b0100_0000,
+        ASN1Class::Universal => 0b0000_0000,
+        ASN1Class::Application => 0b0100_0000,
         ASN1Class::ContextSpecific => 0b1000_0000,
-        ASN1Class::Private         => 0b1100_0000,
+        ASN1Class::Private => 0b1100_0000,
     }
 }
-
 
 fn encode_len(x: usize) -> Vec<u8> {
     if x < 128 {
