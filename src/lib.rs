@@ -26,19 +26,11 @@
 //!
 //! Please send any bug reports, patches, and curses to the GitHub repository
 //! at <code>https://github.com/acw/simple_asn1</code>.
-extern crate chrono;
-extern crate num_bigint;
-extern crate num_traits;
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
-#[cfg(test)]
-extern crate rand;
-
 use chrono::{DateTime, TimeZone, Utc};
 pub use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
-use std::error::Error;
+#[cfg(test)]
+use quickcheck::quickcheck;
 use std::fmt;
 use std::iter::FromIterator;
 use std::mem::size_of;
@@ -324,9 +316,6 @@ pub enum ASN1DecodeErr {
     ///
     /// Invalid ASN.1 input can lead to this error.
     Incomplete,
-
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 impl fmt::Display for ASN1DecodeErr {
@@ -350,44 +339,7 @@ impl fmt::Display for ASN1DecodeErr {
                 write!(f, "Invalid class value: {}", i),
             ASN1DecodeErr::Incomplete =>
                 write!(f, "Incomplete data or invalid ASN1"),
-            ASN1DecodeErr::__Nonexhaustive =>
-              panic!("A non exhaustive error should not be constructed"),
         }
-    }
-}
-
-impl Error for ASN1DecodeErr {
-    fn description(&self) -> &str {
-        match self {
-            ASN1DecodeErr::EmptyBuffer =>
-                "Encountered an empty buffer decoding ASN1 block.",
-            ASN1DecodeErr::BadBooleanLength(_) =>
-                "Bad length field in boolean block.",
-            ASN1DecodeErr::LengthTooLarge(_) =>
-                "Length field too large for object type.",
-            ASN1DecodeErr::UTF8DecodeFailure(_) =>
-                "UTF8 string failed to properly decode.",
-            ASN1DecodeErr::PrintableStringDecodeFailure =>
-                "Printable string failed to properly decode.",
-            ASN1DecodeErr::InvalidDateValue(_) =>
-                "Invalid date value.",
-            ASN1DecodeErr::InvalidClass(_) =>
-                "Invalid class value",
-            ASN1DecodeErr::InvalidBitStringLength(_) =>
-                "Invalid length of bit string",
-            ASN1DecodeErr::Incomplete =>
-                "Incomplete data or invalid ASN1",
-            ASN1DecodeErr::__Nonexhaustive =>
-              panic!("A non exhaustive error should not be constructed"),
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        None
-    }
-
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
     }
 }
 
@@ -401,28 +353,14 @@ pub enum ASN1EncodeErr {
 
 impl fmt::Display for ASN1EncodeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
-    }
-}
-
-impl Error for ASN1EncodeErr {
-    fn description(&self) -> &str {
         match self {
             ASN1EncodeErr::ObjectIdentHasTooFewFields =>
-                "ASN1 object identifier has too few fields.",
+                write!(f,"ASN1 object identifier has too few fields."),
             ASN1EncodeErr::ObjectIdentVal1TooLarge =>
-                "First value in ASN1 OID is too big.",
+                write!(f,"First value in ASN1 OID is too big."),
             ASN1EncodeErr::ObjectIdentVal2TooLarge =>
-                "Second value in ASN1 OID is too big."
+                write!(f,"Second value in ASN1 OID is too big."),
         }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        None
-    }
-
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
     }
 }
 
