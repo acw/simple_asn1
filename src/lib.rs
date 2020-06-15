@@ -160,22 +160,22 @@ impl PartialEq for ASN1Block {
             (&ASN1Block::OctetString(_, ref a1), &ASN1Block::OctetString(_, ref a2)) => (a1 == a2),
             (&ASN1Block::Null(_), &ASN1Block::Null(_)) => true,
             (&ASN1Block::ObjectIdentifier(_, ref a1), &ASN1Block::ObjectIdentifier(_, ref a2)) => {
-                (a1 == a2)
+                a1 == a2
             }
             (&ASN1Block::UTF8String(_, ref a1), &ASN1Block::UTF8String(_, ref a2)) => (a1 == a2),
             (&ASN1Block::PrintableString(_, ref a1), &ASN1Block::PrintableString(_, ref a2)) => {
-                (a1 == a2)
+                a1 == a2
             }
             (&ASN1Block::TeletexString(_, ref a1), &ASN1Block::TeletexString(_, ref a2)) => {
-                (a1 == a2)
+                a1 == a2
             }
             (&ASN1Block::IA5String(_, ref a1), &ASN1Block::IA5String(_, ref a2)) => (a1 == a2),
             (&ASN1Block::UTCTime(_, ref a1), &ASN1Block::UTCTime(_, ref a2)) => (a1 == a2),
             (&ASN1Block::GeneralizedTime(_, ref a1), &ASN1Block::GeneralizedTime(_, ref a2)) => {
-                (a1 == a2)
+                a1 == a2
             }
             (&ASN1Block::UniversalString(_, ref a1), &ASN1Block::UniversalString(_, ref a2)) => {
-                (a1 == a2)
+                a1 == a2
             }
             (&ASN1Block::BMPString(_, ref a1), &ASN1Block::BMPString(_, ref a2)) => (a1 == a2),
             (&ASN1Block::Sequence(_, ref a1), &ASN1Block::Sequence(_, ref a2)) => (a1 == a2),
