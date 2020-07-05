@@ -29,6 +29,8 @@
 extern crate alloc;
 mod ber;
 mod bitstring;
+mod number;
+mod util;
 
 use chrono::{DateTime, TimeZone, Utc};
 pub use num_bigint::{BigInt, BigUint};
