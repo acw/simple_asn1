@@ -399,13 +399,7 @@ pub enum ASN1EncodeErr {
     ObjectIdentVal2TooLarge,
 }
 
-impl fmt::Display for ASN1EncodeErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
-    }
-}
-
-impl Error for ASN1EncodeErr {
+impl ASN1EncodeErr {
     fn description(&self) -> &str {
         match self {
             ASN1EncodeErr::ObjectIdentHasTooFewFields =>
@@ -415,6 +409,18 @@ impl Error for ASN1EncodeErr {
             ASN1EncodeErr::ObjectIdentVal2TooLarge =>
                 "Second value in ASN1 OID is too big."
         }
+    }
+}
+
+impl fmt::Display for ASN1EncodeErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.description())
+    }
+}
+
+impl Error for ASN1EncodeErr {
+    fn description(&self) -> &str {
+        self.description()
     }
 
     fn cause(&self) -> Option<&dyn Error> {
@@ -1175,7 +1181,7 @@ mod tests {
     use super::*;
     use chrono::offset::LocalResult;
     use quickcheck::{Arbitrary, Gen};
-    use rand::{distributions::Standard, Rng};
+    use rand::{distributions::Standard, prelude::SliceRandom, Rng};
     use std::fs::File;
     use std::io::Read;
 
@@ -1281,7 +1287,7 @@ mod tests {
 
     impl Arbitrary for OID {
         fn arbitrary<G: Gen>(g: &mut G) -> OID {
-            let count = g.gen_range::<usize>(0, 40);
+            let count = g.gen_range::<usize, _, _>(0, 40);
             let val1 = g.gen::<u8>() % 3;
             let v2mod = if val1 == 2 { 176 } else { 40 };
             let val2 = g.gen::<u8>() % v2mod;
@@ -1304,7 +1310,7 @@ mod tests {
     }
 
     fn arb_seq<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize>(1, 64);
+        let count = g.gen_range::<usize, _, _>(1, 64);
         let mut items = Vec::new();
 
         for _ in 0..count {
@@ -1315,7 +1321,7 @@ mod tests {
     }
 
     fn arb_set<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize>(1, 64);
+        let count = g.gen_range::<usize, _, _>(1, 64);
         let mut items = Vec::new();
 
         for _ in 0..count {
@@ -1326,11 +1332,11 @@ mod tests {
     }
 
     fn arb_print<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize>(0, 384);
+        let count = g.gen_range::<usize, _, _>(0, 384);
         let mut items = Vec::new();
 
         for _ in 0..count {
-            let v = g.choose(PRINTABLE_CHARS.as_bytes()).unwrap();
+            let v = PRINTABLE_CHARS.as_bytes().choose(g).unwrap();
             items.push(*v as char);
         }
 
@@ -1338,7 +1344,7 @@ mod tests {
     }
 
     fn arb_ia5<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize>(0, 384);
+        let count = g.gen_range::<usize, _, _>(0, 384);
         let mut items = Vec::new();
 
         for _ in 0..count {
@@ -1370,15 +1376,15 @@ mod tests {
 
     fn arb_utc<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         loop {
-            let y = g.gen_range::<i32>(1970, 2069);
-            let m = g.gen_range::<u32>(1, 13);
-            let d = g.gen_range::<u32>(1, 32);
+            let y = g.gen_range::<i32, _, _>(1970, 2069);
+            let m = g.gen_range::<u32, _, _>(1, 13);
+            let d = g.gen_range::<u32, _, _>(1, 32);
             match Utc.ymd_opt(y, m, d) {
                 LocalResult::None => {}
                 LocalResult::Single(d) => {
-                    let h = g.gen_range::<u32>(0, 24);
-                    let m = g.gen_range::<u32>(0, 60);
-                    let s = g.gen_range::<u32>(0, 60);
+                    let h = g.gen_range::<u32, _, _>(0, 24);
+                    let m = g.gen_range::<u32, _, _>(0, 60);
+                    let s = g.gen_range::<u32, _, _>(0, 60);
                     let t = d.and_hms(h, m, s);
                     return ASN1Block::UTCTime(0, t);
                 }
@@ -1389,16 +1395,16 @@ mod tests {
 
     fn arb_time<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         loop {
-            let y = g.gen_range::<i32>(0, 10000);
-            let m = g.gen_range::<u32>(1, 13);
-            let d = g.gen_range::<u32>(1, 32);
+            let y = g.gen_range::<i32, _, _>(0, 10000);
+            let m = g.gen_range::<u32, _, _>(1, 13);
+            let d = g.gen_range::<u32, _, _>(1, 32);
             match Utc.ymd_opt(y, m, d) {
                 LocalResult::None => {}
                 LocalResult::Single(d) => {
-                    let h = g.gen_range::<u32>(0, 24);
-                    let m = g.gen_range::<u32>(0, 60);
-                    let s = g.gen_range::<u32>(0, 60);
-                    let n = g.gen_range::<u32>(0, 1000000000);
+                    let h = g.gen_range::<u32, _, _>(0, 24);
+                    let m = g.gen_range::<u32, _, _>(0, 60);
+                    let s = g.gen_range::<u32, _, _>(0, 60);
+                    let n = g.gen_range::<u32, _, _>(0, 1000000000);
                     let t = d.and_hms_nano(h, m, s, n);
                     return ASN1Block::GeneralizedTime(0, t);
                 }
@@ -1422,7 +1428,7 @@ mod tests {
     fn arb_unknown<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
         let class = ASN1Class::arbitrary(g);
         let tag = RandomUint::arbitrary(g);
-        let size = g.gen_range::<usize>(0, 128);
+        let size = g.gen_range::<usize, _, _>(0, 128);
         let items = g.sample_iter::<u8, _>(&Standard).take(size).collect();
 
         ASN1Block::Unknown(class, false, 0, tag.x, items)
@@ -1453,7 +1459,7 @@ mod tests {
             possibles.push(arb_explicit);
         }
 
-        match g.choose(&possibles[..]) {
+        match possibles[..].choose(g) {
             Some(f) => f(g, d),
             None => panic!("Couldn't generate arbitrary value."),
         }

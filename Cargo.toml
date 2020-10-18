@@ -9,10 +9,10 @@ license = "ISC"
 repository = "https://github.com/acw/simple_asn1"
 
 [dependencies]
-chrono     = "^0.4.0"
-num-bigint = "^0.2.0"
-num-traits = "^0.2.0"
+chrono     = { default-features = false, features = ["alloc"], version = "0.4" }
+num-bigint = { default-features = false, version = "0.3" }
+num-traits = { default-features = false, version = "0.2" }
 
 [dev-dependencies]
-quickcheck = "^0.7.1"
-rand = "0.5.5"
+quickcheck = "0.9"
+rand = "0.7"
