@@ -30,6 +30,7 @@ extern crate alloc;
 mod ber;
 mod bitstring;
 mod number;
+mod real;
 mod util;
 
 use chrono::{DateTime, TimeZone, Utc};

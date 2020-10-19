@@ -1,4 +1,5 @@
 use core::convert::TryFrom;
+use core::ops::{Neg, ShlAssign};
 use crate::ber::length::ConversionError;
 #[cfg(test)]
 use quickcheck::{quickcheck, Arbitrary, Gen};
@@ -182,5 +183,19 @@ impl<'a> TryFrom<&'a Number> for usize {
         } else {
             Err(ConversionError::ValueTooLarge)
         }
+    }
+}
+
+impl ShlAssign<usize> for Number {
+    fn shl_assign(&mut self, amt: usize) {
+        unimplemented!()
+    }
+}
+
+impl Neg for Number {
+    type Output = Number;
+
+    fn neg(self) -> Number {
+        unimplemented!()
     }
 }
