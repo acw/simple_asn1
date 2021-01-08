@@ -13,6 +13,7 @@ edition = "2018"
 chrono     = { default-features = false, features = ["alloc"], version = "0.4" }
 num-bigint = { default-features = false, version = "0.3" }
 num-traits = { default-features = false, version = "0.2" }
+thiserror  = { default-features = false, version = "1" }
 
 [dev-dependencies]
 quickcheck = "0.9"

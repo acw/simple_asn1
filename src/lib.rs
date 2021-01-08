@@ -31,11 +31,10 @@ pub use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 #[cfg(test)]
 use quickcheck::quickcheck;
-use std::error::Error;
-use std::fmt;
 use std::iter::FromIterator;
 use std::mem::size_of;
 use std::str::Utf8Error;
+use thiserror::Error;
 
 /// An ASN.1 block class.
 ///
@@ -283,93 +282,41 @@ const PRINTABLE_CHARS: &'static str =
     "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
 
 /// An error that can arise decoding ASN.1 primitive blocks.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum ASN1DecodeErr {
+    #[error("Encountered an empty buffer decoding ASN1 block.")]
     EmptyBuffer,
+    #[error("Bad length field in boolean block: {0}")]
     BadBooleanLength(usize),
+    #[error("Length field too large for object type: {0}")]
     LengthTooLarge(usize),
+    #[error("UTF8 string failed to properly decode: {0}")]
     UTF8DecodeFailure(Utf8Error),
+    #[error("Printable string failed to properly decode.")]
     PrintableStringDecodeFailure,
+    #[error("Invalid date value: {0}")]
     InvalidDateValue(String),
+    #[error("Invalid length of bit string: {0}")]
     InvalidBitStringLength(isize),
     /// Not a valid ASN.1 class
+    #[error("Invalid class value: {0}")]
     InvalidClass(u8),
     /// Expected more input
     ///
     /// Invalid ASN.1 input can lead to this error.
+    #[error("Incomplete data or invalid ASN1")]
     Incomplete,
 }
 
-impl fmt::Display for ASN1DecodeErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ASN1DecodeErr::EmptyBuffer => {
-                write!(f, "Encountered an empty buffer decoding ASN1 block.")
-            }
-            ASN1DecodeErr::BadBooleanLength(x) => {
-                write!(f, "Bad length field in boolean block: {}", x)
-            }
-            ASN1DecodeErr::LengthTooLarge(x) => {
-                write!(f, "Length field too large for object type: {}", x)
-            }
-            ASN1DecodeErr::UTF8DecodeFailure(x) => {
-                write!(f, "UTF8 string failed to properly decode: {}", x)
-            }
-            ASN1DecodeErr::PrintableStringDecodeFailure => {
-                write!(f, "Printable string failed to properly decode.")
-            }
-            ASN1DecodeErr::InvalidDateValue(x) => write!(f, "Invalid date value: {}", x),
-            ASN1DecodeErr::InvalidBitStringLength(i) => {
-                write!(f, "Invalid length of bit string: {}", i)
-            }
-            ASN1DecodeErr::InvalidClass(i) => write!(f, "Invalid class value: {}", i),
-            ASN1DecodeErr::Incomplete => write!(f, "Incomplete data or invalid ASN1"),
-        }
-    }
-}
-
 /// An error that can arise encoding ASN.1 primitive blocks.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum ASN1EncodeErr {
+    #[error("ASN1 object identifier has too few fields.")]
     ObjectIdentHasTooFewFields,
+    #[error("First value in ASN1 OID is too big.")]
     ObjectIdentVal1TooLarge,
+    #[error("Second value in ASN1 OID is too big.")]
     ObjectIdentVal2TooLarge,
-}
-
-impl ASN1EncodeErr {
-    fn description(&self) -> &str {
-        match self {
-            ASN1EncodeErr::ObjectIdentHasTooFewFields => {
-                "ASN1 object identifier has too few fields."
-            }
-            ASN1EncodeErr::ObjectIdentVal1TooLarge => {
-                "First value in ASN1 OID is too big."
-            }
-            ASN1EncodeErr::ObjectIdentVal2TooLarge => {
-                "Second value in ASN1 OID is too big."
-            }
-        }
-    }
-}
-
-impl fmt::Display for ASN1EncodeErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
-    }
-}
-
-impl Error for ASN1EncodeErr {
-    fn description(&self) -> &str {
-        self.description()
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        None
-    }
-
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
 }
 
 /// Translate a binary blob into a series of `ASN1Block`s, or provide an
