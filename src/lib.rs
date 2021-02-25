@@ -279,7 +279,7 @@ macro_rules! oid {
 }
 
 const PRINTABLE_CHARS: &'static str =
-    "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
 
 /// An error that can arise decoding ASN.1 primitive blocks.
 #[derive(Clone, Debug, Error, PartialEq)]
