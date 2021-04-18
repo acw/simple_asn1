@@ -16,5 +16,5 @@ num-traits = { default-features = false, version = "0.2" }
 thiserror  = { default-features = false, version = "1" }
 
 [dev-dependencies]
-quickcheck = "0.9"
-rand = "0.7"
+quickcheck = "1.0.3"
+rand = "0.8.3"

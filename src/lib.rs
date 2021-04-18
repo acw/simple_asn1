@@ -281,6 +281,13 @@ macro_rules! oid {
 const PRINTABLE_CHARS: &'static str =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+,-./:=? ";
 
+#[cfg(test)]
+const KNOWN_TAGS: &[u8] =
+    &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+      0x0c, 0x10, 0x11, 0x13, 0x14, 0x16,
+      0x17, 0x18, 0x1c, 0x1e,
+     ];
+
 /// An error that can arise decoding ASN.1 primitive blocks.
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum ASN1DecodeErr {
@@ -1040,13 +1047,12 @@ mod tests {
     use super::*;
     use chrono::offset::LocalResult;
     use quickcheck::{Arbitrary, Gen};
-    use rand::{distributions::Standard, prelude::SliceRandom, Rng};
     use std::fs::File;
     use std::io::Read;
 
     impl Arbitrary for ASN1Class {
-        fn arbitrary<G: Gen>(g: &mut G) -> ASN1Class {
-            match g.gen::<u8>() % 4 {
+        fn arbitrary(g: &mut Gen) -> ASN1Class {
+            match u8::arbitrary(g) % 4 {
                 0 => ASN1Class::Private,
                 1 => ASN1Class::ContextSpecific,
                 2 => ASN1Class::Universal,
@@ -1072,8 +1078,8 @@ mod tests {
     }
 
     impl Arbitrary for RandomUint {
-        fn arbitrary<G: Gen>(g: &mut G) -> RandomUint {
-            let v = BigUint::from_u32(g.gen::<u32>()).unwrap();
+        fn arbitrary(g: &mut Gen) -> RandomUint {
+            let v = BigUint::from_u32(u32::arbitrary(g)).unwrap();
             RandomUint { x: v }
         }
     }
@@ -1102,54 +1108,64 @@ mod tests {
     }
 
     impl Arbitrary for RandomInt {
-        fn arbitrary<G: Gen>(g: &mut G) -> RandomInt {
-            let v = BigInt::from_i64(g.gen::<i64>()).unwrap();
+        fn arbitrary(g: &mut Gen) -> RandomInt {
+            let v = BigInt::from_i64(i64::arbitrary(g)).unwrap();
             RandomInt { x: v }
         }
     }
 
     #[allow(type_alias_bounds)]
-    type ASN1BlockGen<G: Gen> = fn(&mut G, usize) -> ASN1Block;
+    type ASN1BlockGen = fn(&mut Gen, usize) -> ASN1Block;
 
-    fn arb_boolean<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let v = g.gen::<bool>();
+    fn arb_boolean(g: &mut Gen, _d: usize) -> ASN1Block {
+        let v = bool::arbitrary(g);
         ASN1Block::Boolean(0, v)
     }
 
-    fn arb_integer<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_integer(g: &mut Gen, _d: usize) -> ASN1Block {
         let d = RandomInt::arbitrary(g);
         ASN1Block::Integer(0, d.x)
     }
 
-    fn arb_bitstr<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let size = g.gen::<u16>() as usize % 16;
+    fn arb_bitstr(g: &mut Gen, _d: usize) -> ASN1Block {
+        let size = u16::arbitrary(g) as usize % 16;
         let maxbits = (size as usize) * 8;
-        let modbits = g.gen::<u8>() as usize % 8;
+        let modbits = u8::arbitrary(g) as usize % 8;
         let nbits = if modbits > maxbits {
             maxbits
         } else {
             maxbits - modbits
         };
-        let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
+        
+        let mut bytes = Vec::with_capacity(size);
+        while bytes.len() < size {
+            bytes.push(u8::arbitrary(g));
+        }
+
         ASN1Block::BitString(0, nbits, bytes)
     }
 
-    fn arb_octstr<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let size = g.gen::<u16>() as usize % 16;
-        let bytes = g.sample_iter::<u8, _>(&Standard).take(size).collect();
+    fn arb_octstr(g: &mut Gen, _d: usize) -> ASN1Block {
+        let size = usize::arbitrary(g) % 16;
+        let mut bytes = Vec::with_capacity(size);
+
+        while bytes.len() < size {
+            bytes.push(u8::arbitrary(g));
+        }
+
         ASN1Block::OctetString(0, bytes)
     }
 
-    fn arb_null<G: Gen>(_g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_null(_g: &mut Gen, _d: usize) -> ASN1Block {
         ASN1Block::Null(0)
     }
 
     impl Arbitrary for OID {
-        fn arbitrary<G: Gen>(g: &mut G) -> OID {
-            let count = g.gen_range::<usize, _, _>(0, 40);
-            let val1 = g.gen::<u8>() % 3;
+        fn arbitrary(g: &mut Gen) -> OID {
+            let count = usize::arbitrary(g) % 40;
+            let val1 = u8::arbitrary(g) % 3;
             let v2mod = if val1 == 2 { 176 } else { 40 };
-            let val2 = g.gen::<u8>() % v2mod;
+            let val2 = u8::arbitrary(g) % v2mod;
             let v1 = BigUint::from_u8(val1).unwrap();
             let v2 = BigUint::from_u8(val2).unwrap();
             let mut nums = vec![v1, v2];
@@ -1163,13 +1179,13 @@ mod tests {
         }
     }
 
-    fn arb_objid<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_objid(g: &mut Gen, _d: usize) -> ASN1Block {
         let oid = OID::arbitrary(g);
         ASN1Block::ObjectIdentifier(0, oid)
     }
 
-    fn arb_seq<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize, _, _>(1, 64);
+    fn arb_seq(g: &mut Gen, d: usize) -> ASN1Block {
+        let count = usize::arbitrary(g) % 63 + 1;
         let mut items = Vec::new();
 
         for _ in 0..count {
@@ -1179,8 +1195,8 @@ mod tests {
         ASN1Block::Sequence(0, items)
     }
 
-    fn arb_set<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize, _, _>(1, 64);
+    fn arb_set(g: &mut Gen, d: usize) -> ASN1Block {
+        let count = usize::arbitrary(g) % 63 + 1;
         let mut items = Vec::new();
 
         for _ in 0..count {
@@ -1190,60 +1206,60 @@ mod tests {
         ASN1Block::Set(0, items)
     }
 
-    fn arb_print<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize, _, _>(0, 384);
+    fn arb_print(g: &mut Gen, _d: usize) -> ASN1Block {
+        let count = usize::arbitrary(g) % 384;
         let mut items = Vec::new();
 
         for _ in 0..count {
-            let v = PRINTABLE_CHARS.as_bytes().choose(g).unwrap();
-            items.push(*v as char);
+            let v = g.choose(PRINTABLE_CHARS.as_bytes());
+            items.push(*v.unwrap() as char);
         }
 
         ASN1Block::PrintableString(0, String::from_iter(items.iter()))
     }
 
-    fn arb_ia5<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
-        let count = g.gen_range::<usize, _, _>(0, 384);
+    fn arb_ia5(g: &mut Gen, _d: usize) -> ASN1Block {
+        let count = usize::arbitrary(g) % 384;
         let mut items = Vec::new();
 
         for _ in 0..count {
-            items.push(g.gen::<u8>() as char);
+            items.push(u8::arbitrary(g) as char);
         }
 
         ASN1Block::IA5String(0, String::from_iter(items.iter()))
     }
 
-    fn arb_utf8<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_utf8(g: &mut Gen, _d: usize) -> ASN1Block {
         let val = String::arbitrary(g);
         ASN1Block::UTF8String(0, val)
     }
 
-    fn arb_tele<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_tele(g: &mut Gen, _d: usize) -> ASN1Block {
         let val = String::arbitrary(g);
         ASN1Block::TeletexString(0, val)
     }
 
-    fn arb_uni<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_uni(g: &mut Gen, _d: usize) -> ASN1Block {
         let val = String::arbitrary(g);
         ASN1Block::UniversalString(0, val)
     }
 
-    fn arb_bmp<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_bmp(g: &mut Gen, _d: usize) -> ASN1Block {
         let val = String::arbitrary(g);
         ASN1Block::BMPString(0, val)
     }
 
-    fn arb_utc<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_utc(g: &mut Gen, _d: usize) -> ASN1Block {
         loop {
-            let y = g.gen_range::<i32, _, _>(1970, 2069);
-            let m = g.gen_range::<u32, _, _>(1, 13);
-            let d = g.gen_range::<u32, _, _>(1, 32);
+            let y = (i32::arbitrary(g) % 100).abs() + 1970;
+            let m = u32::arbitrary(g) % 12 + 1;
+            let d = u32::arbitrary(g) % 31 + 1; 
             match Utc.ymd_opt(y, m, d) {
                 LocalResult::None => {}
                 LocalResult::Single(d) => {
-                    let h = g.gen_range::<u32, _, _>(0, 24);
-                    let m = g.gen_range::<u32, _, _>(0, 60);
-                    let s = g.gen_range::<u32, _, _>(0, 60);
+                    let h = u32::arbitrary(g) % 24;
+                    let m = u32::arbitrary(g) % 60;
+                    let s = u32::arbitrary(g) % 60;
                     let t = d.and_hms(h, m, s);
                     return ASN1Block::UTCTime(0, t);
                 }
@@ -1252,18 +1268,18 @@ mod tests {
         }
     }
 
-    fn arb_time<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_time(g: &mut Gen, _d: usize) -> ASN1Block {
         loop {
-            let y = g.gen_range::<i32, _, _>(0, 10000);
-            let m = g.gen_range::<u32, _, _>(1, 13);
-            let d = g.gen_range::<u32, _, _>(1, 32);
+            let y = (i32::arbitrary(g) % 10000).abs();
+            let m = u32::arbitrary(g) % 12 + 1;
+            let d = u32::arbitrary(g) % 31 + 1; 
             match Utc.ymd_opt(y, m, d) {
                 LocalResult::None => {}
                 LocalResult::Single(d) => {
-                    let h = g.gen_range::<u32, _, _>(0, 24);
-                    let m = g.gen_range::<u32, _, _>(0, 60);
-                    let s = g.gen_range::<u32, _, _>(0, 60);
-                    let n = g.gen_range::<u32, _, _>(0, 1000000000);
+                    let h = u32::arbitrary(g) % 24;
+                    let m = u32::arbitrary(g) % 60;
+                    let s = u32::arbitrary(g) % 60;
+                    let n = u32::arbitrary(g) % 1000000000;
                     let t = d.and_hms_nano(h, m, s, n);
                     return ASN1Block::GeneralizedTime(0, t);
                 }
@@ -1272,7 +1288,7 @@ mod tests {
         }
     }
 
-    fn arb_explicit<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
+    fn arb_explicit(g: &mut Gen, d: usize) -> ASN1Block {
         let mut class = ASN1Class::arbitrary(g);
         if class == ASN1Class::Universal {
             // Universal is invalid for an explicitly tagged block
@@ -1284,17 +1300,28 @@ mod tests {
         ASN1Block::Explicit(class, 0, tag.x, Box::new(item))
     }
 
-    fn arb_unknown<G: Gen>(g: &mut G, _d: usize) -> ASN1Block {
+    fn arb_unknown(g: &mut Gen, _d: usize) -> ASN1Block {
         let class = ASN1Class::arbitrary(g);
-        let tag = RandomUint::arbitrary(g);
-        let size = g.gen_range::<usize, _, _>(0, 128);
-        let items = g.sample_iter::<u8, _>(&Standard).take(size).collect();
+        let tag = loop {
+            let potential = RandomUint::arbitrary(g); 
+            match potential.x.to_u8() {
+                None => break potential,
+                Some(x) if KNOWN_TAGS.contains(&x) => {},
+                Some(_) => break potential,
+            }
+        };
+        let size = usize::arbitrary(g) % 128;
+        let mut items = Vec::with_capacity(size);
+        
+        while items.len() < size {
+            items.push(u8::arbitrary(g));
+        }
 
         ASN1Block::Unknown(class, false, 0, tag.x, items)
     }
 
-    fn limited_arbitrary<G: Gen>(g: &mut G, d: usize) -> ASN1Block {
-        let mut possibles: Vec<ASN1BlockGen<G>> = vec![
+    fn limited_arbitrary(g: &mut Gen, d: usize) -> ASN1Block {
+        let mut possibles: Vec<ASN1BlockGen> = vec![
             arb_boolean,
             arb_integer,
             arb_bitstr,
@@ -1318,14 +1345,14 @@ mod tests {
             possibles.push(arb_explicit);
         }
 
-        match possibles[..].choose(g) {
+        match g.choose(&possibles[..]) {
             Some(f) => f(g, d),
             None => panic!("Couldn't generate arbitrary value."),
         }
     }
 
     impl Arbitrary for ASN1Block {
-        fn arbitrary<G: Gen>(g: &mut G) -> ASN1Block {
+        fn arbitrary(g: &mut Gen) -> ASN1Block {
             limited_arbitrary(g, 2)
         }
     }
