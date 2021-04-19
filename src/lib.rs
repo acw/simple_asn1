@@ -1534,4 +1534,46 @@ mod tests {
             assert_eq!(raw_oid, &expected[6..(expected.len() - 4)]);
         }
     }
+
+    #[test]
+    fn openssl_ec_key_test() {
+        use ASN1Block::{Sequence, Explicit, Integer, ObjectIdentifier,
+          OctetString};
+
+        // Create openssl ec key
+        let private_key = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        let der = to_der(
+            &ASN1Block::Sequence(0, vec![
+                // Version
+                ASN1Block::Integer(0, 1.into()),
+                // Private key
+                ASN1Block::OctetString(0, private_key.clone()),
+                // Parameters
+                // Explicitely tagged oid
+                // Oid: 1, 2, 840, 10045, 3, 1, 7,
+                ASN1Block::Explicit(ASN1Class::ContextSpecific, 0, 0u8.into(),
+                    Box::new(ASN1Block::ObjectIdentifier(0,
+                        OID::new(vec![
+                            1u8.into(), 2u8.into(), 840u16.into(),
+                            10045u16.into(), 3u8.into(), 1u8.into(), 7u8.into(),
+                        ])
+                )))
+            ])
+        ).unwrap();
+        let der_data = vec![48, 25, 2, 1, 1, 4, 8, 0, 1, 2, 3, 4, 5, 6, 7, 160,
+            10, 6, 8, 42, 134, 72, 206, 61, 3, 1, 7];
+
+        assert_eq!(der, der_data);
+
+        assert_eq!(
+            from_der(&der_data),
+            Ok(vec![Sequence(0, vec![Integer(2, 1u8.into()),
+                OctetString(5, private_key),
+                Explicit(ASN1Class::ContextSpecific, 15, 0u8.into(),
+                    Box::new(ObjectIdentifier(17, OID(vec![1u8.into(),
+                        2u8.into(), 840u16.into(), 10045u16.into(), 3u8.into(),
+                        1u8.into(), 7u8.into(),
+                    ]))))])]),
+        );
+    }
 }
