@@ -31,6 +31,7 @@ pub use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 #[cfg(test)]
 use quickcheck::quickcheck;
+use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::mem::size_of;
 use std::str::Utf8Error;
@@ -241,6 +242,19 @@ impl OID {
             _ => Err(ASN1EncodeErr::ObjectIdentHasTooFewFields),
         }
     }
+
+    pub fn as_vec<'a, T: TryFrom<&'a BigUint>>(&'a self) -> Result<Vec<T>, ASN1DecodeErr> {
+        let mut vec = Vec::new();
+        for val in self.0.iter() {
+            let ul = match T::try_from(val) {
+                Ok(a) => a,
+                Err(_) => return Err(ASN1DecodeErr::Overflow),
+            };
+            vec.push(ul);
+        }
+
+        Ok(vec)
+    }
 }
 
 impl<'a> PartialEq<OID> for &'a OID {
@@ -313,6 +327,8 @@ pub enum ASN1DecodeErr {
     /// Invalid ASN.1 input can lead to this error.
     #[error("Incomplete data or invalid ASN1")]
     Incomplete,
+    #[error("Value overflow")]
+    Overflow,
 }
 
 /// An error that can arise encoding ASN.1 primitive blocks.
@@ -1533,5 +1549,24 @@ mod tests {
             let raw_oid = test.0.as_raw().expect("Failed to convert OID to raw");
             assert_eq!(raw_oid, &expected[6..(expected.len() - 4)]);
         }
+    }
+
+    #[test]
+    fn vec_oid() {
+        let vec_u64: Vec<u64> = vec![1, 2, 840, 10045, 4, 3, 2];
+        let vec_i64: Vec<i64> = vec![1, 2, 840, 10045, 4, 3, 2];
+        let vec_usize: Vec<usize> = vec![1, 2, 840, 10045, 4, 3, 2];
+
+        let mut o = Vec::new();
+        for val in vec_u64.iter() {
+            o.push(BigUint::from(*val));
+        }
+
+        let oid = OID::new(o);
+
+        assert_eq!(Ok(vec_u64), oid.as_vec());
+        assert_eq!(Ok(vec_i64), oid.as_vec());
+        assert_eq!(Ok(vec_usize), oid.as_vec());
+        assert_eq!(Err(ASN1DecodeErr::Overflow), oid.as_vec::<u8>());
     }
 }
