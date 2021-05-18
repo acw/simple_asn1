@@ -1,6 +1,6 @@
 [package]
 name = "simple_asn1"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Adam Wick <awick@uhsure.com>"]
 description = "A simple DER/ASN.1 encoding/decoding library."
 categories = ["encoding"]
