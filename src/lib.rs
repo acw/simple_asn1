@@ -286,9 +286,9 @@ macro_rules! oid {
         let mut res = Vec::new();
 
         $(
-            res.push(BigUint::from($e as u64));
+            res.push($crate::BigUint::from($e as u64));
         )*
-        OID::new(res)
+        $crate::OID::new(res)
     }};
 }
 
