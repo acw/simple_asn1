@@ -1,6 +1,6 @@
 [package]
 name = "simple_asn1"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["Adam Wick <awick@uhsure.com>"]
 description = "A simple DER/ASN.1 encoding/decoding library."
 categories = ["encoding"]
@@ -17,4 +17,4 @@ thiserror  = { default-features = false, version = "1" }
 
 [dev-dependencies]
 quickcheck = "1.0.3"
-rand = "0.8.3"
+rand = "0.8.4"
