@@ -26,7 +26,6 @@
 //!
 //! Please send any bug reports, patches, and curses to the GitHub repository
 //! at <code>https://github.com/acw/simple_asn1</code>.
-// use chrono::{DateTime, TimeZone, Utc};
 pub use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 #[cfg(test)]
