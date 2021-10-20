@@ -10,10 +10,10 @@ repository = "https://github.com/acw/simple_asn1"
 edition = "2018"
 
 [dependencies]
-chrono     = { default-features = false, features = ["alloc"], version = "0.4" }
 num-bigint = { default-features = false, version = "0.4" }
 num-traits = { default-features = false, version = "0.2" }
 thiserror  = { default-features = false, version = "1" }
+time       = { default-features = false, version = "0.3", features = ["formatting", "macros", "parsing", "quickcheck"] }
 
 [dev-dependencies]
 quickcheck = "1.0.3"
