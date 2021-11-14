@@ -1444,7 +1444,9 @@ mod tests {
     fn utc_time_tests() {
         // Check for a regression against issue #27, in which this would
         // cause a panic.
-        let input = [55, 13, 13, 133, 13, 13, 50, 13, 13, 133, 13, 13, 50, 13, 133];
+        let input = [
+            55, 13, 13, 133, 13, 13, 50, 13, 13, 133, 13, 13, 50, 13, 133,
+        ];
         let output = from_der(&input);
         assert!(output.is_err());
     }
