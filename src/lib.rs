@@ -505,7 +505,13 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
 
                 let v = String::from_iter(body.iter().map(|x| *x as char));
 
-                let y = &v[0..2];
+                let y = match v.get(0..2) {
+                    Some(yy) => yy,
+                    None => {
+                        // This wasn't a valid character boundrary.
+                        return Err(ASN1DecodeErr::InvalidDateValue(v));
+                    }
+                };
 
                 let y_prefix = match y.parse::<u8>() {
                     Err(_) => return Err(ASN1DecodeErr::InvalidDateValue(v)),
@@ -1436,6 +1442,15 @@ mod tests {
     fn result_int(v: i16) -> Result<Vec<ASN1Block>, ASN1DecodeErr> {
         let val = BigInt::from(v);
         Ok(vec![ASN1Block::Integer(0, val)])
+    }
+
+    #[test]
+    fn utc_time_tests() {
+        // Check for a regression against issue #27, in which this would
+        // cause a panic.
+        let input = [55, 13, 13, 133, 13, 13, 50, 13, 13, 133, 13, 13, 50, 13, 133];
+        let output = from_der(&input);
+        assert!(output.is_err());
     }
 
     #[test]
