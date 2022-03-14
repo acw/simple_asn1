@@ -13,8 +13,9 @@ edition = "2018"
 num-bigint = { default-features = false, version = "0.4" }
 num-traits = { default-features = false, version = "0.2" }
 thiserror  = { default-features = false, version = "1" }
-time       = { default-features = false, version = "0.3", features = ["formatting", "macros", "parsing", "quickcheck"] }
+time       = { default-features = false, version = "0.3", features = ["formatting", "macros", "parsing"] }
 
 [dev-dependencies]
 quickcheck = "1.0.3"
 rand = "0.8.4"
+time = { default-features = false, version = "0.3", features = ["formatting", "macros", "parsing", "quickcheck"] }
