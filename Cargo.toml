@@ -7,7 +7,7 @@ categories = ["encoding"]
 keywords = ["ASN1","encoding","DER"]
 license = "ISC"
 repository = "https://github.com/acw/simple_asn1"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 num-bigint = { default-features = false, version = "0.4" }
