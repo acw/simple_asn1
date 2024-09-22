@@ -18,4 +18,4 @@ time       = { default-features = false, version = "0.3", features = ["formattin
 [dev-dependencies]
 quickcheck = "1.0.3"
 rand = "0.8.4"
-time = { default-features = false, version = "0.3", features = ["formatting", "macros", "parsing", "quickcheck"] }
+time = { default-features = false, version = "0.3", features = ["formatting", "large-dates", "macros", "parsing", "quickcheck"] }

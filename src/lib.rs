@@ -515,10 +515,14 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                     }
                 };
 
-                let v = format!("{}{}", y_prefix, v);
+                let mut v = format!("{}{}", y_prefix, v);
+                // add a manual delimitter between known year position and rest of the
+                // date string to handle ambiguities when "time/large-dates" feature is
+                // enabled
+                v.insert(4, ':');
 
                 let format = time::format_description::parse(
-                    "[year][month][day][hour repr:24][minute][second]Z",
+                    "[year]:[month][day][hour repr:24][minute][second]Z",
                 )
                 .unwrap();
 
@@ -549,9 +553,13 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                     let idx = v.len() - 1;
                     v.insert(idx, '0');
                 }
+                // add a manual delimitter between known year position and rest of the
+                // date string to handle ambiguities when "time/large-dates" feature is
+                // enabled
+                v.insert(4, ':');
 
                 let format = time::format_description::parse(
-                    "[year][month][day][hour repr:24][minute][second].[subsecond]Z",
+                    "[year]:[month][day][hour repr:24][minute][second].[subsecond]Z",
                 )
                 .unwrap();
 
