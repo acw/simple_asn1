@@ -1,6 +1,6 @@
 [package]
 name = "simple_asn1"
-version = "0.6.2"
+version = "0.6.3"
 authors = ["Adam Wick <awick@uhsure.com>"]
 description = "A simple DER/ASN.1 encoding/decoding library."
 categories = ["encoding"]
@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 num-bigint = { default-features = false, version = "0.4" }
 num-traits = { default-features = false, version = "0.2" }
-thiserror  = { default-features = false, version = "1" }
+thiserror  = { default-features = false, version = "2" }
 time       = { default-features = false, version = "0.3", features = ["formatting", "macros", "parsing"] }
 
 [dev-dependencies]
