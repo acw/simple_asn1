@@ -152,34 +152,34 @@ impl ASN1Block {
 impl PartialEq for ASN1Block {
     fn eq(&self, other: &ASN1Block) -> bool {
         match (self, other) {
-            (&ASN1Block::Boolean(_, a1), &ASN1Block::Boolean(_, a2)) => (a1 == a2),
-            (&ASN1Block::Integer(_, ref a1), &ASN1Block::Integer(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::Boolean(_, a1), &ASN1Block::Boolean(_, a2)) => a1 == a2,
+            (&ASN1Block::Integer(_, ref a1), &ASN1Block::Integer(_, ref a2)) => a1 == a2,
             (&ASN1Block::BitString(_, a1, ref b1), &ASN1Block::BitString(_, a2, ref b2)) => {
                 (a1 == a2) && (b1 == b2)
             }
-            (&ASN1Block::OctetString(_, ref a1), &ASN1Block::OctetString(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::OctetString(_, ref a1), &ASN1Block::OctetString(_, ref a2)) => a1 == a2,
             (&ASN1Block::Null(_), &ASN1Block::Null(_)) => true,
             (&ASN1Block::ObjectIdentifier(_, ref a1), &ASN1Block::ObjectIdentifier(_, ref a2)) => {
                 a1 == a2
             }
-            (&ASN1Block::UTF8String(_, ref a1), &ASN1Block::UTF8String(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::UTF8String(_, ref a1), &ASN1Block::UTF8String(_, ref a2)) => a1 == a2,
             (&ASN1Block::PrintableString(_, ref a1), &ASN1Block::PrintableString(_, ref a2)) => {
                 a1 == a2
             }
             (&ASN1Block::TeletexString(_, ref a1), &ASN1Block::TeletexString(_, ref a2)) => {
                 a1 == a2
             }
-            (&ASN1Block::IA5String(_, ref a1), &ASN1Block::IA5String(_, ref a2)) => (a1 == a2),
-            (&ASN1Block::UTCTime(_, ref a1), &ASN1Block::UTCTime(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::IA5String(_, ref a1), &ASN1Block::IA5String(_, ref a2)) => a1 == a2,
+            (&ASN1Block::UTCTime(_, ref a1), &ASN1Block::UTCTime(_, ref a2)) => a1 == a2,
             (&ASN1Block::GeneralizedTime(_, ref a1), &ASN1Block::GeneralizedTime(_, ref a2)) => {
                 a1 == a2
             }
             (&ASN1Block::UniversalString(_, ref a1), &ASN1Block::UniversalString(_, ref a2)) => {
                 a1 == a2
             }
-            (&ASN1Block::BMPString(_, ref a1), &ASN1Block::BMPString(_, ref a2)) => (a1 == a2),
-            (&ASN1Block::Sequence(_, ref a1), &ASN1Block::Sequence(_, ref a2)) => (a1 == a2),
-            (&ASN1Block::Set(_, ref a1), &ASN1Block::Set(_, ref a2)) => (a1 == a2),
+            (&ASN1Block::BMPString(_, ref a1), &ASN1Block::BMPString(_, ref a2)) => a1 == a2,
+            (&ASN1Block::Sequence(_, ref a1), &ASN1Block::Sequence(_, ref a2)) => a1 == a2,
+            (&ASN1Block::Set(_, ref a1), &ASN1Block::Set(_, ref a2)) => a1 == a2,
             (
                 &ASN1Block::Explicit(a1, _, ref b1, ref c1),
                 &ASN1Block::Explicit(a2, _, ref b2, ref c2),
