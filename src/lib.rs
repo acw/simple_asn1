@@ -515,7 +515,7 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
 
                 let v = format!("{}{}", y_prefix, v);
 
-                let format = time::format_description::parse(
+                let format = time::format_description::parse_borrowed::<1>(
                     "[year][month][day][hour repr:24][minute][second]Z",
                 )
                 .unwrap();
@@ -548,7 +548,7 @@ fn from_der_(i: &[u8], start_offset: usize) -> Result<Vec<ASN1Block>, ASN1Decode
                     v.insert(idx, '0');
                 }
 
-                let format = time::format_description::parse(
+                let format = time::format_description::parse_borrowed::<1>(
                     "[year][month][day][hour repr:24][minute][second].[subsecond]Z",
                 )
                 .unwrap();
@@ -827,7 +827,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
             Ok(res)
         }
         ASN1Block::UTCTime(_, ref time) => {
-            let format = time::format_description::parse(
+            let format = time::format_description::parse_borrowed::<1>(
                 "[year][month][day][hour repr:24][minute][second]Z",
             )
             .unwrap();
@@ -844,7 +844,7 @@ pub fn to_der(i: &ASN1Block) -> Result<Vec<u8>, ASN1EncodeErr> {
             Ok(res)
         }
         ASN1Block::GeneralizedTime(_, ref time) => {
-            let format = time::format_description::parse(
+            let format = time::format_description::parse_borrowed::<1>(
                 "[year][month][day][hour repr:24][minute][second].[subsecond]",
             )
             .unwrap();
